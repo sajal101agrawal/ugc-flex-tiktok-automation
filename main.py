@@ -14,7 +14,6 @@ import base64
 load_dotenv()
 
 
-# Function to handle CAPTCHA detection and solve it using the SadCaptcha API
 def image_to_base64(driver, image_element):
     # Execute JavaScript to get the base64-encoded image from the blob URL
     base64_image = driver.execute_script("""
