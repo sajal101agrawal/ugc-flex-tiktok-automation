@@ -10,7 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os
 import time
-import tempfile
+from fake_useragent import UserAgent
 
 def perform_logout(driver):
     try:
@@ -181,8 +181,11 @@ def main():
         chrome_options.add_argument("--remote-debugging-port=9222")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--enable-unsafe-swiftshader")
-        chrome_options.add_argument("--user-agent=Your New User-Agent String Here")
+        # chrome_options.add_argument("--user-agent=Your New User-Agent String Here")
         chrome_options.add_argument("--guest")
+        ua = UserAgent()
+        user_agent = ua.random
+        chrome_options.add_argument(f"user-agent={user_agent}")
 
         driver = webdriver.Chrome(options=chrome_options)
 
@@ -192,17 +195,17 @@ def main():
         driver.get("https://www.tiktok.com/")
 
         time.sleep(5)
-        # try:
-        #     Profile_div = WebDriverWait(driver, 10).until(
-        #         EC.presence_of_element_located((By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[3]/div[1]/div[9]/a/button/div/div[1]/div/img'))
-        #     )
-        #     print("User is already logged in.")
-        #     # perform_logout(driver)
+        try:
+            Profile_div = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[3]/div[1]/div[9]/a/button/div/div[1]/div/img'))
+            )
+            print("User is already logged in.")
+            # perform_logout(driver)
 
-        # except:
-        #     # If profile div is not found, login is required
-        #     print("User is not logged in. Attempting to log in.")
-        # perform_login(driver, email, password)
+        except:
+            # If profile div is not found, login is required
+            print("User is not logged in. Attempting to log in.")
+        perform_login(driver, email, password)
 
         reply_to_all_comment(driver, "asu.official", "Testing comment")
 

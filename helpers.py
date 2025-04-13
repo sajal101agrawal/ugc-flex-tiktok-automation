@@ -4,6 +4,9 @@ import base64
 import os
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import pickle
+import time
+import random
 
 BASE_URL = 'https://www.sadcaptcha.com/api/v1'
 
@@ -164,3 +167,28 @@ def handle_captcha(driver):
                 break
     else:
         print("No CAPTCHA detected!")
+
+
+def random_delay(min_sec=1, max_sec=3):
+    """ Adds a random delay between actions to make the bot look more human-like. """
+    time.sleep(random.randint(min_sec, max_sec))
+
+
+def save_cookies(driver, filename="cookies.pkl"):
+    """ Save browser cookies to a file for session reuse. """
+    cookies = driver.get_cookies()
+    with open(filename, "wb") as file:
+        pickle.dump(cookies, file)
+    print("Cookies saved successfully!")
+
+
+def load_cookies(driver, filename="cookies.pkl"):
+    """ Load cookies from file to maintain session. """
+    if os.path.exists(filename):
+        with open(filename, "rb") as file:
+            cookies = pickle.load(file)
+            for cookie in cookies:
+                driver.add_cookie(cookie)
+        print("Cookies loaded successfully!")
+    else:
+        print("No cookies file found. New session will be created.")
