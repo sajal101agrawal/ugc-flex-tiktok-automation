@@ -1,224 +1,85 @@
 import os
-# from dotenv import load_dotenv
-
-# load_dotenv()
-
+import time
+import random
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import os
-import time
 from fake_useragent import UserAgent
-from selenium.webdriver.common.action_chains import ActionChains
-import random
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
-# import undetected_chromedriver as uc
-
-def click_random_scroll_button(driver):
-    try:
-        print("[*] Attempting to randomly scroll...")
-        buttons = driver.find_elements(By.XPATH, "//aside[contains(@class,'AsideOneColumnSidebar')]//button")
-
-        scroll_buttons = []
-        for btn in buttons:
-            if btn.get_attribute("aria-disabled") == "false":
-                scroll_buttons.append(btn)
-
-        if not scroll_buttons:
-            print("[-] No active scroll buttons found.")
-            return False
-
-        selected_button = random.choice(scroll_buttons)
-        driver.execute_script("arguments[0].scrollIntoView(true);", selected_button)
-        random_sleep(1, 2)
-        selected_button.click()
-        print("[+] Random scroll button clicked.")
-        return True
-
-    except Exception as e:
-        print(f"[!] Error during scroll: {str(e)}")
-        return False
-
-def try_to_like_video(driver):
-    try:
-        like_button = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.XPATH, "//button[@aria-label[contains(., 'Like video')]]"))
-        )
-        aria_pressed = like_button.get_attribute("aria-pressed")
-        if aria_pressed == "false":
-            like_button.click()
-            print("[+] Video liked.")
-        else:
-            print("[~] Video already liked.")
-    except Exception as e:
-        print("[!] Could not like video:", e)
-
-
-def perform_logout(driver):
-    try:
-        print("Attempting to log out...")
-
-        button_div = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[3]/div[1]/div[10]/button/div/div[1]/div'))
-        )
-        button_div.click()
-
-        print("Button Clicked!")
-
-        logout_button_div = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '//*[@id="creator-tools-selection-menu-header"]/li[8]/button/div'))
-        )
-        logout_button_div.click()
-        print("Logout Button Clicked!")
-
-        logout_div = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '/html/body/div[10]/div[3]/div/div/div/div[2]/button[2]'))
-        )
-        logout_div.click()
-        print("You have been logged out")
-
-    except Exception as e:
-        print(f"Error during login: {e}")
-        raise
-
-
-def perform_login(driver, email, password):
-    try:
-        print("Attempting to log in...")
-
-        login_with_email_part = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '//*[@id="app"]/div/div[1]/div[1]/div/div[3]/div[2]'))
-        )
-        login_with_email_part.click()
-        print("Switched to email/password login part.")
-
-        login_with_email_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div/div[2]/div[1]/form/div[1]/a'))
-        )
-        login_with_email_button.click()
-        print("Switched to email/password login.")
-
-        email_input = driver.find_element(By.XPATH, "//input[@name='username']")
-        email_input.send_keys(email)
-
-        password_input = driver.find_element(By.CSS_SELECTOR, "input[type='password']")
-        password_input.send_keys(password)
-
-        print("Password entered and login attempt submitted.")
-
-        login_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div/div[2]/div[1]/form/button'))
-        )
-        login_button.click()
-        print("Login button clicked!!")
-
-        time.sleep(30)
-        # handle_captcha(driver)
-        print("Captcha handled or login complete.")
-
-    except Exception as e:
-        print(f"Error during login: {e}")
-        raise
-
-
-def reply_to_all_comment(driver, account_name, reply_text):
-    try:
-        print("ACCOUNTS DISABLED")
-        # Step 1: Click on the button to open the account search form
-        button_div = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.CLASS_NAME, "css-1khkwzw-DivIconWithRedDotContainer"))
-        )
-        button_div.click()
-        print("Search button clicked.")
-
-        # Step 2: Wait for the form to appear and fill in account details
-        search_input = button_div.find_element(By.XPATH, '//*[@id="app"]/div[2]/div/div/div[5]/div[1]/div[2]/form/input')
-        search_input.send_keys(account_name)
-        search_input.send_keys(Keys.RETURN)
-        print(f"Searched for account: {account_name}")
-        print("Please solve the CAPTCHA manually if prompted.")
-        time.sleep(5)
-
-        # Step 3: Wait for the account to appear in the search results and click it
-        account_div = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//*[@id='tabs-0-panel-search_top']/div/div/div[1]/div[2]/div/div"))
-        )
-        account_div.click()
-        print(f"Navigated to {account_name}'s profile.")
-        time.sleep(20)
-
-        # Step 4: Find the first post in the account's profile
-        # first_post_video = WebDriverWait(driver, 10).until(
-        #     EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div/div/div[2]/div[3]/div/div[1]/div/div/div/a/div[1]/div[1]/div[2]/div/video"))
-        # )
-        # first_post_video.click()
-
-        # Step 5: Wait for the first comment to load
-        # first_comment_on_video = WebDriverWait(driver, 10).until(
-        #     EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[4]/div/div[2]/div[1]/div/div[3]/div/div[1]"))
-        # )
-        # print("First Comment found.")
-
-        post_elements = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.XPATH, "//*[@id='main-content-others_homepage']/div/div[2]/div[3]/div/div"))
-        )
-        if not post_elements:
-            print("No posts found for this account.")
-            return
-        print(f"Found {len(post_elements)} posts.")
-
-        for index, post in enumerate(post_elements, start=1):
-            print(f"Opening post {index}...")
-
-            post.click()
-            time.sleep(5)
-            
-            comments_loaded = False
-            while not comments_loaded:
-                try:
-                    comments_section = driver.find_elements(By.XPATH, "//*[@id='app']/div[2]/div[4]/div/div[2]/div[1]/div/div[position() >= 3]")
-                    if not comments_section:
-                        print("No comments found starting from the third one.")
-                        break
-                    print(f"Found {len(comments_section)} comments (starting from the third one).")
-                    for comment in comments_section:
-                        try:
-                            reply_button = WebDriverWait(comment, 10).until(
-                                EC.element_to_be_clickable(
-                                    (By.XPATH, ".//span[@aria-label='Reply' and @role='button' and contains(@class, 'css-cpmlpt-SpanReplyButton')]")
-                                )
-                            )
-                            reply_button.click()
-                            time.sleep(1)
-                            reply_input = comment.find_element(By.XPATH, '//*[@id="placeholder-fovu"]')
-                            # reply_input.send_keys(reply_text)
-                            # reply_input.send_keys(Keys.RETURN)
-                            print("Replied to comment.")
-                        except Exception as reply_error:
-                            print(f"Error replying to comment: {str(reply_error)}")
-
-                    driver.execute_script("window.scrollBy(0, 300);")
-                    time.sleep(2)
-
-                    comments_loaded = True
-                except Exception as e:
-                    print(f"Error while loading comments: {str(e)}")
-                    break
-            driver.back()
-            time.sleep(3)
-            print(f"Back to the feed after post {index}.")
-        
-    except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        raise
-
-
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 def random_sleep(min_sec=1, max_sec=3):
     time.sleep(random.uniform(min_sec, max_sec))
+
+def perform_login(driver, email, password):
+    try:
+        print("[*] Waiting for login fields...")
+
+        username_input = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.XPATH, "//input[@name='username']"))
+        )
+        username_input.clear()
+        username_input.send_keys(email)
+
+        password_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//input[@type='password']"))
+        )
+        password_input.clear()
+        password_input.send_keys(password)
+
+        print("[*] Credentials filled. Please manually click the 'Log in' button.")
+        print("[*] Waiting for login success (up to 2 mins)...")
+
+        WebDriverWait(driver, 120).until(
+            EC.presence_of_element_located((By.XPATH, "//*[contains(@aria-label, 'Profile') or contains(@href, '/user')]"))
+        )
+        print("[+] Login successful.")
+    except TimeoutException:
+        print("[!] Login timeout. Please check credentials or complete login manually.")
+        raise
+    except Exception as e:
+        print(f"[!] Login error: {e}")
+        raise
+
+def try_to_like_video(driver):
+    try:
+        like_buttons = driver.find_elements(By.XPATH, "//button[contains(@aria-label, 'Like video')]")
+        for btn in like_buttons:
+            if btn.get_attribute("aria-pressed") == "false":
+                driver.execute_script("arguments[0].scrollIntoView(true);", btn)
+                random_sleep(1, 2)
+                btn.click()
+                print("[+] Video liked.")
+                return
+        print("[~] No likeable video found or already liked.")
+    except Exception as e:
+        print(f"[!] Like action failed: {e}")
+
+def click_random_scroll_button(driver, scroll_up_count, max_up=2):
+    try:
+        buttons = driver.find_elements(By.XPATH, "//aside[contains(@class,'AsideOneColumnSidebar')]//button")
+        scroll_buttons = [btn for btn in buttons if btn.get_attribute("aria-disabled") == "false"]
+
+        if not scroll_buttons:
+            print("[-] No active scroll buttons found.")
+            return False, scroll_up_count
+
+        scroll_direction = "up" if (scroll_up_count < max_up and random.random() < 0.3) else "down"
+        selected_button = scroll_buttons[0] if scroll_direction == "up" else scroll_buttons[-1]
+
+        driver.execute_script("arguments[0].scrollIntoView(true);", selected_button)
+        random_sleep(1, 2)
+        selected_button.click()
+        print(f"[+] Scrolled {scroll_direction} using button.")
+        if scroll_direction == "up":
+            scroll_up_count += 1
+        return True, scroll_up_count
+
+    except Exception as e:
+        print(f"[!] Scroll error: {e}")
+        return False, scroll_up_count
 
 def main():
     driver = None
@@ -234,45 +95,31 @@ def main():
         ua = UserAgent()
         user_agent = ua.random
         options.add_argument(f"user-agent={user_agent}")
-       
+
         driver = webdriver.Chrome(options=options)
         driver.maximize_window()
 
-        email = "japdavev5@gmail.com"
-        password = "Tech@123$$$"
+        email = "sajal101agrawal@gmail.com"
+        password = "@Tdnfi7nupy8"
 
-        driver.get("https://www.tiktok.com/login/phone-or-email/email")
-        
-        random_sleep(30, 90)
+        driver.get("https://www.tiktok.com/login")
+        random_sleep(5, 10)
 
-        # time.sleep(120)
-        # # try:
-        # #     Profile_div = WebDriverWait(driver, 10).until(
-        # #         EC.presence_of_element_located((By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[3]/div[1]/div[9]/a/button/div/div[1]/div/img'))
-        # #     )
-        # #     print("User is already logged in.")
-        # perform_logout(driver)
-
-        # # except:
-        # #     # If profile div is not found, login is required
-        # #     print("User is not logged in. Attempting to log in.")
-        # perform_login(driver, email, password)
-
-        # # reply_to_all_comment(driver, "asu.official", "Testing comment")
+        perform_login(driver, email, password)
 
         video_count = random.randint(6, 10)
         like_index = random.randint(1, video_count - 2)
         share_index = random.randint(like_index + 1, video_count)
+        scroll_up_count = 0
 
         for i in range(video_count):
-            print(f"[*] Watching video {i + 1}/{video_count}")
-            random_sleep(3, 5)
+            print(f"\n[*] Watching video {i + 1}/{video_count}")
+            
+            random_sleep(30, 50)
 
-            # Like a video at a random position
             if i == like_index:
                 try_to_like_video(driver)
 
-            # Share at a different random position
             if i == share_index:
                 try:
                     share_button = driver.find_element(By.XPATH, '//*[@id="column-list-container"]/article[1]/div/section[2]/button[3]')
@@ -280,7 +127,6 @@ def main():
                     print("[*] Share button clicked.")
                     random_sleep(2, 3)
 
-                    # Click 'Copy Link' in the popup
                     try:
                         copy_btn = driver.find_element(By.XPATH, "//div[contains(text(), 'Copy link')]")
                         copy_btn.click()
@@ -290,7 +136,6 @@ def main():
 
                     random_sleep(1, 2)
 
-                    # Try to close the popup
                     try:
                         close_popup = driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Close')]")
                         close_popup.click()
@@ -300,27 +145,21 @@ def main():
                 except Exception as e:
                     print("[!] Share flow failed:", e)
 
-            # Scroll to next video
-            # driver.execute_script("window.scrollBy(0, 800);")
-            # random_sleep(3, 5)
-            
-            if not click_random_scroll_button(driver):
-                print("[!] Falling back to window scroll.")
-                scroll_direction = random.choice(["up", "down"])
-                pixels = random.randint(500, 1000)
-                direction_multiplier = -1 if scroll_direction == "up" else 1
-                driver.execute_script(f"window.scrollBy(0, {direction_multiplier * pixels});")
-                print(f"[~] Scrolled {scroll_direction} as fallback.")
-                
-            random_sleep(3, 5)
-            
+            success, scroll_up_count = click_random_scroll_button(driver, scroll_up_count)
+            if not success:
+                print("[!] Fallback to JS scroll.")
+                direction = -1 if scroll_up_count < 2 and random.random() < 0.3 else 1
+                pixels = random.randint(500, 1000) * direction
+                driver.execute_script(f"window.scrollBy(0, {pixels});")
+                if direction < 0:
+                    scroll_up_count += 1
+                print(f"[~] JS scrolled {'up' if direction < 0 else 'down'}.")
 
-            
-            
+            random_sleep(3, 5)
 
     except Exception as e:
-        print(f"Error in main process: {str(e)}")
-    
+        print(f"[!] Main error: {e}")
+
     finally:
         if driver:
             driver.quit()
