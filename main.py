@@ -11,6 +11,10 @@ from selenium.webdriver.support import expected_conditions as EC
 import os
 import time
 from fake_useragent import UserAgent
+from selenium.webdriver.common.action_chains import ActionChains
+import random
+from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
+import undetected_chromedriver as uc
 
 def perform_logout(driver):
     try:
@@ -45,7 +49,7 @@ def perform_login(driver, email, password):
         print("Attempting to log in...")
 
         login_with_email_part = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div/div[2]/div/div/div/div[3]/div[2]/div[2]'))
+            EC.element_to_be_clickable((By.XPATH, '//*[@id="app"]/div/div[1]/div[1]/div/div[3]/div[2]'))
         )
         login_with_email_part.click()
         print("Switched to email/password login part.")
@@ -170,46 +174,97 @@ def reply_to_all_comment(driver, account_name, reply_text):
         print(f"Error occurred: {str(e)}")
         raise
 
+
+
+def random_sleep(min_sec=1, max_sec=3):
+    time.sleep(random.uniform(min_sec, max_sec))
+
 def main():
     driver = None
     try:
-        chrome_options = Options()
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--log-level=0")
-        chrome_options.add_argument("--user-data-dir=/tmp/chrome-user-data")
-        chrome_options.add_argument("--remote-debugging-port=9222")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--enable-unsafe-swiftshader")
-        # chrome_options.add_argument("--user-agent=Your New User-Agent String Here")
-        chrome_options.add_argument("--guest")
+        options = Options()
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--disable-infobars")
+        options.add_argument("--start-maximized")
+
         ua = UserAgent()
         user_agent = ua.random
-        chrome_options.add_argument(f"user-agent={user_agent}")
+        options.add_argument(f"user-agent={user_agent}")
+       
+        driver = webdriver.Chrome(options=options)
+        driver.maximize_window()
 
-        driver = webdriver.Chrome(options=chrome_options)
+        email = "japdavev5@gmail.com"
+        password = "Tech@123$$$"
 
-        email = os.getenv("EMAIL")
-        password = os.getenv("PASSWORD")
+        driver.get("https://www.tiktok.com/login")
 
-        driver.get("https://www.tiktok.com/")
+        time.sleep(120)
+        # # try:
+        # #     Profile_div = WebDriverWait(driver, 10).until(
+        # #         EC.presence_of_element_located((By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[3]/div[1]/div[9]/a/button/div/div[1]/div/img'))
+        # #     )
+        # #     print("User is already logged in.")
+        # perform_logout(driver)
 
-        time.sleep(5)
-        try:
-            Profile_div = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[3]/div[1]/div[9]/a/button/div/div[1]/div/img'))
-            )
-            print("User is already logged in.")
-            # perform_logout(driver)
+        # # except:
+        # #     # If profile div is not found, login is required
+        # #     print("User is not logged in. Attempting to log in.")
+        # perform_login(driver, email, password)
 
-        except:
-            # If profile div is not found, login is required
-            print("User is not logged in. Attempting to log in.")
-        perform_login(driver, email, password)
+        # # reply_to_all_comment(driver, "asu.official", "Testing comment")
 
-        reply_to_all_comment(driver, "asu.official", "Testing comment")
+        video_count = random.randint(6, 10)
+        like_index = random.randint(1, video_count - 2)
+        share_index = random.randint(like_index + 1, video_count)
 
-        time.sleep(5)
+        for i in range(video_count):
+            print(f"[*] Watching video {i + 1}/{video_count}")
+            random_sleep(3, 5)
+
+            # Like a video at a random position
+            if i == like_index:
+                try:
+                    like_button = driver.find_element(By.XPATH, '//*[@id="column-list-container"]/article[1]/div/section[2]/button[1]')
+                    like_button.click()
+                    print("[+] Video liked.")
+                except Exception as e:
+                    print("[!] Could not like video:", e)
+
+            # Share at a different random position
+            if i == share_index:
+                try:
+                    share_button = driver.find_element(By.XPATH, '//*[@id="column-list-container"]/article[1]/div/section[2]/button[3]')
+                    share_button.click()
+                    print("[*] Share button clicked.")
+                    random_sleep(2, 3)
+
+                    # Click 'Copy Link' in the popup
+                    try:
+                        copy_btn = driver.find_element(By.XPATH, "//div[contains(text(), 'Copy link')]")
+                        copy_btn.click()
+                        print("[+] Link copied.")
+                    except NoSuchElementException:
+                        print("[!] Copy link not found.")
+
+                    random_sleep(1, 2)
+
+                    # Try to close the popup
+                    try:
+                        close_popup = driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Close')]")
+                        close_popup.click()
+                        print("[*] Share popup closed.")
+                    except NoSuchElementException:
+                        print("[-] Close button for share popup not found.")
+                except Exception as e:
+                    print("[!] Share flow failed:", e)
+
+            # Scroll to next video
+            driver.execute_script("window.scrollBy(0, 800);")
+            random_sleep(3, 5)
 
     except Exception as e:
         print(f"Error in main process: {str(e)}")
