@@ -1,7 +1,8 @@
 import os
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -14,7 +15,47 @@ from fake_useragent import UserAgent
 from selenium.webdriver.common.action_chains import ActionChains
 import random
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
-import undetected_chromedriver as uc
+# import undetected_chromedriver as uc
+
+def click_random_scroll_button(driver):
+    try:
+        print("[*] Attempting to randomly scroll...")
+        buttons = driver.find_elements(By.XPATH, "//aside[contains(@class,'AsideOneColumnSidebar')]//button")
+
+        scroll_buttons = []
+        for btn in buttons:
+            if btn.get_attribute("aria-disabled") == "false":
+                scroll_buttons.append(btn)
+
+        if not scroll_buttons:
+            print("[-] No active scroll buttons found.")
+            return False
+
+        selected_button = random.choice(scroll_buttons)
+        driver.execute_script("arguments[0].scrollIntoView(true);", selected_button)
+        random_sleep(1, 2)
+        selected_button.click()
+        print("[+] Random scroll button clicked.")
+        return True
+
+    except Exception as e:
+        print(f"[!] Error during scroll: {str(e)}")
+        return False
+
+def try_to_like_video(driver):
+    try:
+        like_button = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.XPATH, "//button[@aria-label[contains(., 'Like video')]]"))
+        )
+        aria_pressed = like_button.get_attribute("aria-pressed")
+        if aria_pressed == "false":
+            like_button.click()
+            print("[+] Video liked.")
+        else:
+            print("[~] Video already liked.")
+    except Exception as e:
+        print("[!] Could not like video:", e)
+
 
 def perform_logout(driver):
     try:
@@ -200,9 +241,11 @@ def main():
         email = "japdavev5@gmail.com"
         password = "Tech@123$$$"
 
-        driver.get("https://www.tiktok.com/login")
+        driver.get("https://www.tiktok.com/login/phone-or-email/email")
+        
+        random_sleep(30, 90)
 
-        time.sleep(120)
+        # time.sleep(120)
         # # try:
         # #     Profile_div = WebDriverWait(driver, 10).until(
         # #         EC.presence_of_element_located((By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[3]/div[1]/div[9]/a/button/div/div[1]/div/img'))
@@ -227,12 +270,7 @@ def main():
 
             # Like a video at a random position
             if i == like_index:
-                try:
-                    like_button = driver.find_element(By.XPATH, '//*[@id="column-list-container"]/article[1]/div/section[2]/button[1]')
-                    like_button.click()
-                    print("[+] Video liked.")
-                except Exception as e:
-                    print("[!] Could not like video:", e)
+                try_to_like_video(driver)
 
             # Share at a different random position
             if i == share_index:
@@ -263,8 +301,22 @@ def main():
                     print("[!] Share flow failed:", e)
 
             # Scroll to next video
-            driver.execute_script("window.scrollBy(0, 800);")
+            # driver.execute_script("window.scrollBy(0, 800);")
+            # random_sleep(3, 5)
+            
+            if not click_random_scroll_button(driver):
+                print("[!] Falling back to window scroll.")
+                scroll_direction = random.choice(["up", "down"])
+                pixels = random.randint(500, 1000)
+                direction_multiplier = -1 if scroll_direction == "up" else 1
+                driver.execute_script(f"window.scrollBy(0, {direction_multiplier * pixels});")
+                print(f"[~] Scrolled {scroll_direction} as fallback.")
+                
             random_sleep(3, 5)
+            
+
+            
+            
 
     except Exception as e:
         print(f"Error in main process: {str(e)}")
