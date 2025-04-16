@@ -51,6 +51,7 @@ def perform_login(driver, email, password):
     except Exception as e:
         print(f"[!] Login error: {e}")
         raise
+
 def get_active_scroll_index(driver):
     script = """
     const articles = document.querySelectorAll('article[data-scroll-index]');
@@ -183,7 +184,7 @@ def main():
 
         driver = uc.Chrome(headless=False)
         driver.maximize_window()
-        api_key = "5a42012209289ee170f48a66f4155b3b"   
+        api_key = "ca73e4fdf55a63b83ecfff3194754775"   # SADCAPTCHA API key
         sadcaptcha = SeleniumSolver(
             driver,
             api_key,
@@ -194,8 +195,8 @@ def main():
         # Selenium code that causes a TikTok or Douyin captcha...
         
 
-        email = "japdavev5@gmail.com"
-        password = "Tech@123$$$"
+        email = "sajal101agrawal@gmail.com"
+        password = "@Tdnfi7nupy8"
 
         driver.get("https://www.tiktok.com/login")
         random_sleep(2,5)
