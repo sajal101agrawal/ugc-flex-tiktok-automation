@@ -2,18 +2,30 @@ import os
 import time
 import random
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from fake_useragent import UserAgent
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from fake_useragent import UserAgent
 from tiktok_captcha_solver import SeleniumSolver
 import undetected_chromedriver as uc
 
 def random_sleep(min_sec=1, max_sec=3):
     time.sleep(random.uniform(min_sec, max_sec))
+
+def with_retries(fn, retries=3, delay=2, backoff=2, **kwargs):
+    for attempt in range(retries):
+        try:
+            return fn(**kwargs)
+        except Exception as e:
+            print(f"[!] Attempt {attempt + 1} failed for {fn.__name__}: {e}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+                delay *= backoff
+            else:
+                print(f"[X] Failed after {retries} attempts.")
+                raise
 
 def perform_login(driver, email, password):
     try:
@@ -22,7 +34,6 @@ def perform_login(driver, email, password):
 
         fields_option = driver.find_element(By.XPATH, '//*[@id="loginContainer"]/div[1]/form/div[1]/a')
         fields_option.click()
-
 
         print("[*] Waiting for login fields...")
 
@@ -38,13 +49,11 @@ def perform_login(driver, email, password):
         password_input.clear()
         password_input.send_keys(password)
 
-        print("[*] Credentials filled. Please manually click the 'Log in' button.")
-        print("[*] Waiting for login success (up to 2 mins)...")
-
         login_btn = driver.find_element(By.XPATH, '//*[@id="loginContainer"]/div[1]/form/button')
         login_btn.click()
-        print("[+] Login successful.")
-    
+
+        print("[+] Login attempted. Waiting for response...")
+        random_sleep(3, 5)
     except TimeoutException:
         print("[!] Login timeout. Please check credentials or complete login manually.")
         raise
@@ -66,47 +75,38 @@ def get_active_scroll_index(driver):
     return driver.execute_script(script)
 
 def try_to_like_video(driver):
-    try:
-        index = get_active_scroll_index(driver)
-        print(f"[*] Active scroll index: {index}")
-        article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
-        like_btn = article.find_element(By.XPATH, ".//section[2]//button[2]")
-        like_btn.click()
-        random_sleep(1, 2)
-        print("[+] Video liked.")
-        return
-
-    except Exception as e:
-        print(f"[!] Like action failed: {e}")
+    index = get_active_scroll_index(driver)
+    print(f"[*] Active scroll index: {index}")
+    article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
+    like_btn = article.find_element(By.XPATH, ".//section[2]//button[2]")
+    like_btn.click()
+    random_sleep(1, 2)
+    print("[+] Video liked.")
 
 def try_to_share_video(driver):
+    index = get_active_scroll_index(driver)
+    print(f"[*] Active scroll index: {index}")
+    article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
+    share_btn = article.find_element(By.XPATH, ".//section[2]//button[4]")
+    share_btn.click()
+    print("[*] Share button clicked.")
+    random_sleep(2, 3)
+
     try:
-        index = get_active_scroll_index(driver)
-        print(f"[*] Active scroll index: {index}")
-        article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
-        share_btn = article.find_element(By.XPATH, ".//section[2]//button[4]")
-        share_btn.click()
-        print("[*] Share button clicked.")
-        random_sleep(2, 3)
+        copy_btn = driver.find_element(By.XPATH, "//div[contains(text(), 'Copy link')]")
+        copy_btn.click()
+        print("[+] Link copied.")
+    except NoSuchElementException:
+        print("[!] Copy link not found.")
 
-        try:
-            copy_btn = driver.find_element(By.XPATH, "//div[contains(text(), 'Copy link')]")
-            copy_btn.click()
-            print("[+] Link copied.")
-        except NoSuchElementException:
-            print("[!] Copy link not found.")
+    random_sleep(1, 2)
 
-        random_sleep(1, 2)
-
-        try:
-            close_popup = driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Close')]")
-            close_popup.click()
-            print("[*] Share popup closed.")
-        except NoSuchElementException:
-            print("[-] Close button for share popup not found.")
-        return
-    except Exception as e:
-        print("[!] Share flow failed:", e)
+    try:
+        close_popup = driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Close')]")
+        close_popup.click()
+        print("[*] Share popup closed.")
+    except NoSuchElementException:
+        print("[-] Close button for share popup not found.")
 
 def click_random_scroll_button(driver, scroll_up_count, max_up=2):
     try:
@@ -124,86 +124,68 @@ def click_random_scroll_button(driver, scroll_up_count, max_up=2):
         random_sleep(1, 2)
         selected_button.click()
         print(f"[+] Scrolled {scroll_direction} using button.")
+
         if scroll_direction == "up":
             scroll_up_count += 1
         return True, scroll_up_count
-
     except Exception as e:
         print(f"[!] Scroll error: {e}")
         return False, scroll_up_count
 
 def is_captcha_present(driver):
     try:
-        # Method 1: Check for iframe that contains CAPTCHA
-        iframe = driver.find_element(By.XPATH, "//iframe[contains(@src, 'captcha')]")
+        driver.find_element(By.XPATH, "//iframe[contains(@src, 'captcha')]")
         print("[*] CAPTCHA iframe detected.")
         return True
     except NoSuchElementException:
         pass
 
     try:
-        # Method 2: Check for common verification text
-        verify_text = driver.find_element(By.XPATH, "//*[contains(text(), 'Verify') or contains(text(), 'Slide to verify')]")
+        driver.find_element(By.XPATH, "//*[contains(text(), 'Verify') or contains(text(), 'Slide to verify')]")
         print("[*] CAPTCHA verify text detected.")
         return True
     except NoSuchElementException:
         return False
 
-def safe_action(driver, sadcaptcha, action_fn, *args, **kwargs):
-    """
-    Wraps an action function and checks for CAPTCHA before or after it runs.
-    """
-    if is_captcha_present(driver):
-        print("[!] CAPTCHA detected before action.")
-        sadcaptcha.solve_captcha_if_present()
-        print("[+] CAPTCHA solved. Retrying action.")
+def safe_action(driver, sadcaptcha, action_fn, *args, retries=3, **kwargs):
+    for attempt in range(retries):
+        try:
+            if is_captcha_present(driver):
+                print("[!] CAPTCHA detected before action.")
+                sadcaptcha.solve_captcha_if_present()
+                print("[+] CAPTCHA solved.")
 
-    result = action_fn(driver, *args, **kwargs)
+            result = action_fn(driver, *args, **kwargs)
 
-    if is_captcha_present(driver):
-        print("[!] CAPTCHA detected after action.")
-        sadcaptcha.solve_captcha_if_present()
-        print("[+] CAPTCHA solved.")
+            if is_captcha_present(driver):
+                print("[!] CAPTCHA detected after action.")
+                sadcaptcha.solve_captcha_if_present()
+                print("[+] CAPTCHA solved.")
 
-    return result
+            return result
+        except Exception as e:
+            print(f"[!] safe_action attempt {attempt + 1} failed: {e}")
+            if attempt == retries - 1:
+                raise
+            time.sleep(2)
 
 def main():
     driver = None
     try:
-        # options = Options()
-        # options.add_argument("--no-sandbox")
-        # options.add_argument("--disable-dev-shm-usage")
-        # options.add_argument("--disable-gpu")
-        # options.add_argument("--disable-blink-features=AutomationControlled")
-        # options.add_argument("--disable-infobars")
-        # options.add_argument("--start-maximized")
-
-        # ua = UserAgent()
-        # user_agent = ua.random
-        # options.add_argument(f"user-agent={user_agent}")
-
         driver = uc.Chrome(headless=False)
         driver.maximize_window()
-        api_key = "ca73e4fdf55a63b83ecfff3194754775"   # SADCAPTCHA API key
-        sadcaptcha = SeleniumSolver(
-            driver,
-            api_key,
-            mouse_step_size=1, # Adjust to change mouse speed
-            mouse_step_delay_ms=20 # Adjust to change mouse speed
-        )
 
-        # Selenium code that causes a TikTok or Douyin captcha...
-        
+        api_key = "ca73e4fdf55a63b83ecfff3194754775"
+        sadcaptcha = SeleniumSolver(driver, api_key, mouse_step_size=1, mouse_step_delay_ms=20)
 
         email = "sajal101agrawal@gmail.com"
         password = "@Tdnfi7nupy8"
 
         driver.get("https://www.tiktok.com/login")
-        random_sleep(2,5)
+        random_sleep(2, 5)
         sadcaptcha.solve_captcha_if_present()
 
-        safe_action(driver, sadcaptcha, perform_login, email, password)
-        # perform_login(driver, email, password)
+        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
 
         video_count = random.randint(6, 10)
         like_index = random.randint(1, video_count - 2)
@@ -212,16 +194,22 @@ def main():
 
         for i in range(video_count):
             print(f"\n[*] Watching video {i + 1}/{video_count}")
-            
             random_sleep(10, 15)
+
             if i == like_index:
-                # try_to_like_video(driver)
-                safe_action(driver, sadcaptcha, try_to_like_video)
+                with_retries(lambda: safe_action(driver, sadcaptcha, try_to_like_video))
 
             if i == share_index:
-               safe_action(driver, sadcaptcha, try_to_share_video)
+                with_retries(lambda: safe_action(driver, sadcaptcha, try_to_share_video))
 
-            success, scroll_up_count = click_random_scroll_button(driver, scroll_up_count)
+            def scroll_fn():
+                return click_random_scroll_button(driver, scroll_up_count)
+            try:
+                success, scroll_up_count = with_retries(scroll_fn)
+            except:
+                print("[X] All scroll attempts failed.")
+                success = False
+
             if not success:
                 print("[!] Fallback to JS scroll.")
                 direction = -1 if scroll_up_count < 2 and random.random() < 0.3 else 1
@@ -235,7 +223,6 @@ def main():
 
     except Exception as e:
         print(f"[!] Main error: {e}")
-
     finally:
         if driver:
             driver.quit()
