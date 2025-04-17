@@ -56,6 +56,27 @@ def perform_login(driver, email, password):
         print(f"[!] Login error: {e}")
         raise
 
+
+def handle_cookie_banner(driver):
+    try:
+        # Wait for the cookie banner component to appear
+        banner = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.TAG_NAME, "tiktok-cookie-banner"))
+        )
+
+        # Then find the "Decline optional cookies" button inside it
+        decline_btn = banner.find_element(By.XPATH, ".//div[@class='button-wrapper']/button[1]")
+        WebDriverWait(driver, 5).until(EC.element_to_be_clickable(decline_btn))
+        decline_btn.click()
+        print("[✓] Declined optional cookies.")
+        random_sleep(1, 2)
+
+    except TimeoutException:
+        print("[~] No cookie banner or already handled.")
+    except Exception as e:
+        print(f"[!] Failed to handle cookie banner: {e}")
+
+
 def get_active_scroll_index(driver):
     script = """
     const articles = document.querySelectorAll('article[data-scroll-index]');
@@ -75,14 +96,17 @@ def try_to_like_video(driver):
         print(f"[*] Active scroll index: {index}")
         article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
         like_btn = article.find_element(By.XPATH, ".//section[2]//button[1]")
-        like_btn.click()
+        try:
+            like_btn.click()
+        except Exception as e:
+            print(f"[!] Default click failed, trying JS click: {e}")
+            driver.execute_script("arguments[0].click();", like_btn)
         random_sleep(1, 2)
         print("[+] Video liked.")
         return
 
     except Exception as e:
         print(f"[!] Like action failed: {e}")
-
 
 def try_to_comment_video(driver):
     try:
@@ -91,19 +115,72 @@ def try_to_comment_video(driver):
         article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
         comment_btn = article.find_element(By.XPATH, ".//section[2]//button[2]")
         comment_btn.click()
+
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((
+                By.XPATH,
+                "//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
+            ))
+        )
+
+        reply_buttons = driver.find_elements(
+            By.XPATH,
+            "//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
+        )
+
+        print(f"[✓] Found {len(reply_buttons)} reply buttons.")
+        if not reply_buttons:
+            print("[-] No reply buttons found.")
+            return
+
+        reply_button = random.choice(reply_buttons)
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", reply_button)
         random_sleep(1, 2)
-        print("[+] Video liked.")
-        return
+        reply_button.click()
+        print("[*] Clicked on random reply button.")
+
+        try:
+            placeholder = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'public-DraftEditorPlaceholder-inner')]"))
+            )
+            placeholder.click()
+            print("[*] Clicked placeholder to focus input.")
+        except:
+            print("[~] Placeholder not found or already gone.")
+
+        # Now send text to the input
+        input_box = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true']"))
+        )
+
+        reply_text = random.choice(["Nice!", "Haha true", "So relatable!", "Agreed"])
+        input_box.send_keys(reply_text)
+        random_sleep(1, 2)
+        input_box.send_keys(Keys.ENTER)
+        print(f"[+] Replied with: {reply_text}")
+
+        try:
+            xpath = ("//button[@role='button' and @aria-label='Close' and @data-e2e='browse-close']"
+                     " | "
+                     "//button[@aria-label='exit']")
+            close_btn = WebDriverWait(driver, 30).until(
+                EC.element_to_be_clickable((By.XPATH, xpath))
+            )
+            close_btn.click()
+            print("[✓] Closed the comment panel.")
+        except Exception as close_error:
+            print(f"[!] Failed to close comment panel: {close_error}")
 
     except Exception as e:
-        print(f"[!] Like action failed: {e}")
+        print(f"[!] Comment reply failed: {e}")
+
 
 def try_to_share_video(driver):
     try:
         index = get_active_scroll_index(driver)
         print(f"[*] Active scroll index: {index}")
         article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
-        share_btn = article.find_element(By.XPATH, ".//section[2]//button[4]")
+        share_btn = article.find_element(By.XPATH, ".//section[2]//button[3]")
         share_btn.click()
         print("[*] Share button clicked.")
         random_sleep(2, 3)
@@ -129,56 +206,53 @@ def try_to_share_video(driver):
     
 def click_random_scroll_button(driver, scroll_up_count, max_up=2):
     try:
-        # Step 1: Get all buttons in the scroll area
-        buttons = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located(
-                (By.XPATH, "//*[@id='main-content-homepage_hot']//aside//button")
-            )
+        # handle_cookie_banner(driver)
+        # Combined XPath for both UI layouts using union (|)
+        xpath = (
+            "//*[@id='main-content-homepage_hot']//aside//button"
+            " | "
+            "//button[@aria-label='Go to next video']"
         )
-        print(f"[✓] Found {len(buttons)} button(s)")
 
-        # Step 2: Log and filter only active buttons
-        for idx, btn in enumerate(buttons):
-            aria_disabled = btn.get_attribute("aria-disabled")
-            print(f"Button {idx}: displayed={btn.is_displayed()}, aria-disabled={aria_disabled}")
-        
+        # Wait for any scroll button from either layout
+        buttons = WebDriverWait(driver, 5).until(
+            EC.presence_of_all_elements_located((By.XPATH, xpath))
+        )
+
+        # Filter usable buttons
         scroll_buttons = [
             btn for btn in buttons
             if btn.is_displayed() and btn.get_attribute("aria-disabled") in [None, "false"]
         ]
 
         if not scroll_buttons:
-            print("[-] No active scroll buttons passed filtering.")
+            print("[-] No usable scroll buttons found.")
             return False, scroll_up_count
 
-        # Step 3: Decide scroll direction
-        scroll_direction = "up" if (scroll_up_count < max_up and random.random() < 0.3) else "down"
+        print(f"[✓] Found {len(scroll_buttons)} usable scroll button(s).")
+
+        # Decide scroll direction
+        scroll_direction = "up" if scroll_up_count < max_up and random.random() < 0.3 else "down"
         selected_button = scroll_buttons[0] if scroll_direction == "up" else scroll_buttons[-1]
 
-        # Step 4: Scroll into view and wait until clickable
+        # Scroll into view and try clicking
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", selected_button)
+        WebDriverWait(driver, 10).until(EC.element_to_be_clickable(selected_button))
         time.sleep(1)
 
-        # Wait until the button is clickable
-        WebDriverWait(driver, 10).until(EC.element_to_be_clickable(selected_button))
-
-        # Step 5: Ensure the button is not intercepted by other elements
-        # Retry clicking if interception occurs (up to 3 attempts)
         for attempt in range(3):
             try:
                 selected_button.click()
                 print(f"[+] Scrolled {scroll_direction} using button.")
-                break  # Break the loop if the click was successful
+                break
             except Exception as e:
                 print(f"[!] Click attempt {attempt + 1} failed: {e}")
-                if attempt == 2:
-                    print("[✖] All click attempts failed. Aborting.")
-                    return False, scroll_up_count
-                # If clicked failed due to interception, reattempt after short delay
                 time.sleep(1)
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", selected_button)
+                if attempt == 2:
+                    print("[✖] All attempts failed. Skipping scroll.")
+                    return False, scroll_up_count
 
-        # Step 6: Track scroll up count
         if scroll_direction == "up":
             scroll_up_count += 1
 
@@ -280,6 +354,7 @@ def handle_after_login(driver, sadcaptcha):
     # if not wait_for_captcha_to_clear(driver, sadcaptcha):
     #     print("[✖] CAPTCHA was not cleared. Aborting.")
     #     return
+    handle_cookie_banner(driver)
     video_count = random.randint(6, 10)
     like_index = 1
     # like_index = random.randint(1, video_count - 2)
@@ -345,8 +420,8 @@ def main():
         # Selenium code that causes a TikTok or Douyin captcha...
         
 
-        # email = "japdavev5@gmail.com"
-        email = os.getenv("EMAIL")
+        email = "japdavev5@gmail.com"
+        # email = os.getenv("EMAIL")
         password = "Tech@123$$$"
 
         driver.get("https://www.tiktok.com/login")
