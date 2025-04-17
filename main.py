@@ -74,8 +74,23 @@ def try_to_like_video(driver):
         index = get_active_scroll_index(driver)
         print(f"[*] Active scroll index: {index}")
         article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
-        like_btn = article.find_element(By.XPATH, ".//section[2]//button[2]")
+        like_btn = article.find_element(By.XPATH, ".//section[2]//button[1]")
         like_btn.click()
+        random_sleep(1, 2)
+        print("[+] Video liked.")
+        return
+
+    except Exception as e:
+        print(f"[!] Like action failed: {e}")
+
+
+def try_to_comment_video(driver):
+    try:
+        index = get_active_scroll_index(driver)
+        print(f"[*] Active scroll index: {index}")
+        article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
+        comment_btn = article.find_element(By.XPATH, ".//section[2]//button[2]")
+        comment_btn.click()
         random_sleep(1, 2)
         print("[+] Video liked.")
         return
@@ -266,8 +281,12 @@ def handle_after_login(driver, sadcaptcha):
     #     print("[✖] CAPTCHA was not cleared. Aborting.")
     #     return
     video_count = random.randint(6, 10)
-    like_index = random.randint(1, video_count - 2)
-    share_index = random.randint(like_index + 1, video_count)
+    like_index = 1
+    # like_index = random.randint(1, video_count - 2)
+    # share_index = random.randint(like_index + 1, video_count)
+    # comment_index = random.randint(like_index + 1, video_count)
+    comment_index = 2
+    share_index = 3
     scroll_up_count = 0
 
     for i in range(video_count):
@@ -277,6 +296,9 @@ def handle_after_login(driver, sadcaptcha):
         print(i)
         if i == like_index:
             safe_action(driver, sadcaptcha, try_to_like_video)
+
+        if i == comment_index:
+            safe_action(driver, sadcaptcha, try_to_comment_video)
 
         if i == share_index:
             safe_action(driver, sadcaptcha, try_to_share_video)
@@ -312,7 +334,7 @@ def main():
 
         driver = uc.Chrome(headless=False)
         driver.maximize_window()
-        api_key = "5a42012209289ee170f48a66f4155b3b"   
+        api_key = "95f77cc41b3f8bccfd02dfb482bf9b75"   
         sadcaptcha = SeleniumSolver(
             driver,
             api_key,
