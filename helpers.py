@@ -230,7 +230,7 @@ def try_to_share_video(driver):
 
     try:
         copy_btn = driver.find_element(By.XPATH,
-            "//div[@data-e2e='share-copy']//div[@tabindex='0'] | //button[contains(., 'Copy link')]"
+            "//div[@data-e2e='share-copy']//div[@tabindex='0'] | //button[contains(@class, 'TUXButton') and contains(@class, 'TUXButton--secondary') and contains(@class, 'css-1gq7k')]"
         )
         copy_btn.click()
         print("[+] Link copied.")

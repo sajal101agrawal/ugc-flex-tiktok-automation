@@ -109,7 +109,7 @@ def main():
 
         if is_verification_prompt_present(driver):
             print("[!] Verification required. Fetching code from email...")
-            time.sleep(5)
+            random_sleep(2, 5)
             if not enter_verification_code(driver, email):
                 print("[✖] Failed to enter verification code.")
                 return
