@@ -13,6 +13,8 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import time
 import random
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
+
 
 
 load_dotenv()
@@ -362,6 +364,19 @@ def with_retries(fn, retries=3, delay=2, backoff=2, **kwargs):
                 raise
 
 
+def is_profile_image(driver):
+    try:
+        profile_img_xpath = '//div[contains(@class, "DivIconWithRedDotContainer")]//img[contains(@class, "ImgAvatar")]'
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, profile_img_xpath))
+        )
+        print("[✓] Profile image found. CAPTCHA likely cleared.")
+        return True
+    except TimeoutException:
+        print("[~] Profile image not found.")
+        return False
+
+
 def wait_for_captcha_to_clear(driver, sadcaptcha, timeout=90):
     """
     Waits until CAPTCHA is no longer present after solving.
@@ -372,6 +387,8 @@ def wait_for_captcha_to_clear(driver, sadcaptcha, timeout=90):
     if "foryou" in driver.current_url:
         print("[✓] Already on /foryou. Skipping CAPTCHA clearance check.")
         return True
+
+    is_profile_image(driver)
 
     if not is_captcha_present(driver):
         print("[✓] No CAPTCHA present.")
@@ -397,6 +414,8 @@ def wait_for_captcha_to_clear(driver, sadcaptcha, timeout=90):
             if "foryou" in driver.current_url:
                 print("[✓] Reached /foryou page. Skipping CAPTCHA check.")
                 return True
+            if is_profile_image(driver):
+                return True
             if not is_captcha_present(driver):
                 cleared = True
                 print("[+] CAPTCHA cleared.")
@@ -411,3 +430,114 @@ def wait_for_captcha_to_clear(driver, sadcaptcha, timeout=90):
 
     print("[✖] CAPTCHA still present after max attempts.")
     return False
+
+
+def _pause_video_with_spacebar(driver):
+    ActionChains(driver).send_keys(Keys.SPACE).perform()
+    print("[✓] Paused/Played video.")
+
+
+def open_comment_section(driver):
+    comment_xpath = "//article[1]/div/section[2]/button[2]/span | //span[@data-e2e='comment-icon']"
+    try:
+        comment_btn = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, comment_xpath)))
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", comment_btn)
+        time.sleep(0.5)
+        driver.execute_script("arguments[0].click();", comment_btn)
+        print("[✓] Comment button clicked.")
+    except Exception:
+        print("[~] Comment button not found.")
+
+
+def is_comment_section_open(driver):
+    try:
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, "//button[@id='comments']")))
+        print("[✓] Comment section loaded.")
+        return True
+    except TimeoutException:
+        return False
+
+
+def try_click_login(driver):
+    try:
+        login_xpath = "//*[@id='main-content-video_detail']/div/div[2]/div[2]/div[2]/div[2]/div/div[2]/div/div/div"
+        login_bar = WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.XPATH, login_xpath)))
+        login_button = login_bar.find_element(By.XPATH, ".//span[contains(text(), 'Log in')]")
+        login_button.click()
+        print("[✓] Login bar clicked.")
+        return True
+    except Exception:
+        print("[~] Login button not found or not clickable.")
+        return False
+
+
+def open_other_login_options(driver):
+    try:
+        xpath = "//div[contains(text(), 'Other login options')]"
+        option = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, xpath)))
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", option)
+        time.sleep(0.3)
+        option.click()
+        print("[✓] Clicked 'Other login options'.")
+    except Exception as e:
+        print(f"[~] Failed to click 'Other login options': {e}")
+
+
+def reopen_comment_section(driver):
+    try:
+        open_comment_section(driver)
+        print("[✓] Re-clicked comment button post login.")
+    except:
+        print("[~] Failed to re-click comment button.")
+
+
+def send_comment(driver, comment):
+    try:
+        input_box = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true']"))
+        )
+        input_box.send_keys(comment)
+        random_sleep(1, 2)
+        input_box.send_keys(Keys.ENTER)
+        print(f"[+] Comment posted: {comment}")
+    except Exception as e:
+        print(f"[!] Failed to send comment: {e}")
+
+
+# def close_comment_panel(driver):
+#     try:
+#         xpath = (
+#             "//button[@role='button' and @aria-label='Close' and @data-e2e='browse-close']"
+#             " | //button[@aria-label='exit']"
+#         )
+#         close_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xpath)))
+#         close_btn.click()
+#         print("[✓] Closed comment panel.")
+#     except Exception as e:
+#         print(f"[!] Could not close comment panel: {e}")
+
+
+def dismiss_cookie_banner(driver):
+    try:
+        print("GET COOKIE BANNER")
+        js = """
+            const banner = document.querySelector('tiktok-cookie-banner');
+            if (!banner) return false;
+            const shadow = banner.shadowRoot;
+            if (!shadow) return false;
+            const buttons = shadow.querySelectorAll('button');
+            for (let btn of buttons) {
+                if (btn.innerText.trim() === 'Decline optional cookies') {
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+        """
+        result = driver.execute_script(js)
+        if result:
+            print("[✓] 'Decline optional cookies' button clicked via JS.")
+        else:
+            print("[~] Could not find or click 'Decline optional cookies' via JS.")
+    except Exception as e:
+        print(f"[✖] Error dismissing cookie banner: {e}")

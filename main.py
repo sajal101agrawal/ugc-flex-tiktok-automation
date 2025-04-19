@@ -7,9 +7,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from tiktok_captcha_solver import SeleniumSolver
 import undetected_chromedriver as uc
-from helpers import enter_verification_code, try_to_like_video, click_random_scroll_button, random_sleep, \
-                    try_to_comment_video, try_to_share_video, safe_action, is_verification_prompt_present, with_retries
+from helpers import _pause_video_with_spacebar, enter_verification_code, is_comment_section_open, \
+                    open_comment_section, open_other_login_options, reopen_comment_section, send_comment, try_click_login, \
+                    try_to_like_video, click_random_scroll_button, random_sleep, with_retries, wait_for_captcha_to_clear, \
+                    try_to_comment_video, try_to_share_video, safe_action, is_verification_prompt_present, dismiss_cookie_banner
 from dotenv import load_dotenv
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
 
 load_dotenv()
@@ -18,7 +22,7 @@ load_dotenv()
 def perform_login(driver, email, password):
     try:
         WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'Use phone / email / username')]"))
+            EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'phone')]"))
         ).click()
 
         fields_option = driver.find_element(By.XPATH, '//*[@id="loginContainer"]/div[1]/form/div[1]/a')
@@ -38,7 +42,9 @@ def perform_login(driver, email, password):
         password_input.clear()
         password_input.send_keys(password)
 
-        login_btn = driver.find_element(By.XPATH, '//*[@id="loginContainer"]/div[1]/form/button')
+        login_btn = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[data-e2e="login-button"]'))
+        )
         login_btn.click()
 
         print("[+] Login attempted. Waiting for response...")
@@ -88,7 +94,33 @@ def handle_after_login(driver, sadcaptcha):
 
         random_sleep(3, 5)
 
-def main():
+
+def comment_on_video(driver, comment, sadcaptcha, email, password):
+    try:
+        _pause_video_with_spacebar(driver)
+        dismiss_cookie_banner(driver)
+        open_comment_section(driver)
+
+        if not is_comment_section_open(driver):
+            print("[✖] Comment section failed to open.")
+            return
+
+        if try_click_login(driver):
+            open_other_login_options(driver)
+            with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
+            print("[✓] Login completed.")
+            if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
+                print("[✖] CAPTCHA not cleared.")
+                return
+
+        reopen_comment_section(driver)
+        send_comment(driver, comment)
+
+    except Exception as e:
+        print(f"[!] pause_video failed: {e}")
+
+
+def main(video_url=None, comment=None):
     driver = None
     try:
         driver = uc.Chrome(headless=False)
@@ -100,38 +132,44 @@ def main():
         # email = "japdavev5@gmail.com"
         email = os.getenv("UNAME")
         password = "Tech@123$$$"
-
-        driver.get("https://www.tiktok.com/login")
-        random_sleep(2, 5)
-        sadcaptcha.solve_captcha_if_present()
-
-        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
-
-        if is_verification_prompt_present(driver):
-            print("[!] Verification required. Fetching code from email...")
+        if video_url and comment:
+            driver.get(video_url)
+            random_sleep(5, 7)
+            comment_on_video(driver, comment, sadcaptcha, email, password)
+        else:
+            driver.get("https://www.tiktok.com/login")
             random_sleep(2, 5)
-            if not enter_verification_code(driver, email):
-                print("[✖] Failed to enter verification code.")
-                return
-            print("[✓] Verification successful, no need to check CAPTCHA.")
+            sadcaptcha.solve_captcha_if_present()
 
-        # else:
-        #     if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-        #         print("[✖] CAPTCHA was not cleared. Aborting.")
-        #         return
+            with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
 
-        try:
-            WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)
-            print(f"[✓] Redirected to {driver.current_url}. Login successful.")
-            handle_after_login(driver, sadcaptcha)
-        except TimeoutException:
-            print(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
+            if is_verification_prompt_present(driver):
+                print("[!] Verification required. Fetching code from email...")
+                random_sleep(2, 5)
+                if not enter_verification_code(driver, email):
+                    print("[✖] Failed to enter verification code.")
+                    return
+                print("[✓] Verification successful, no need to check CAPTCHA.")
+
+            # else:
+            #     if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
+            #         print("[✖] CAPTCHA was not cleared. Aborting.")
+            #         return
+
+            try:
+                WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)
+                print(f"[✓] Redirected to {driver.current_url}. Login successful.")
+                handle_after_login(driver, sadcaptcha)
+            except TimeoutException:
+                print(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
 
     except Exception as e:
         print(f"[!] Main error: {e}")
     finally:
         if driver:
+
             driver.quit()
 
 if __name__ == "__main__":
     main()
+    # main(video_url="https://www.tiktok.com/@pet.babylover88/video/7480131003374259502?is_from_webapp=1&sender_device=pc", comment="Nice!")
