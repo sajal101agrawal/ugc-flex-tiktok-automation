@@ -367,8 +367,14 @@ def with_retries(fn, retries=3, delay=2, backoff=2, **kwargs):
 def is_profile_image(driver):
     try:
         profile_img_xpath = '//div[contains(@class, "DivIconWithRedDotContainer")]//img[contains(@class, "ImgAvatar")]'
+
+        # XPath for div using data-e2e attribute (adjusting the part after `profile-icon` to generalize)
+        profile_div_xpath = '//div[contains(@data-e2e, "profile-icon")]'
+
+        # Wait until one of these elements is located
         WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, profile_img_xpath))
+            EC.presence_of_element_located((By.XPATH, profile_img_xpath)) or 
+            EC.presence_of_element_located((By.XPATH, profile_div_xpath))
         )
         print("[✓] Profile image found. CAPTCHA likely cleared.")
         return True
@@ -432,7 +438,7 @@ def wait_for_captcha_to_clear(driver, sadcaptcha, timeout=90):
     return False
 
 
-def _pause_video_with_spacebar(driver):
+def pause_video_with_spacebar(driver):
     ActionChains(driver).send_keys(Keys.SPACE).perform()
     print("[✓] Paused/Played video.")
 
@@ -440,7 +446,7 @@ def _pause_video_with_spacebar(driver):
 def open_comment_section(driver):
     comment_xpath = "//article[1]/div/section[2]/button[2]/span | //span[@data-e2e='comment-icon']"
     try:
-        comment_btn = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, comment_xpath)))
+        comment_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, comment_xpath)))
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", comment_btn)
         time.sleep(0.5)
         driver.execute_script("arguments[0].click();", comment_btn)
@@ -449,25 +455,35 @@ def open_comment_section(driver):
         print("[~] Comment button not found.")
 
 
+
 def is_comment_section_open(driver):
     try:
-        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, "//button[@id='comments']")))
-        print("[✓] Comment section loaded.")
+        # Create two conditions: one for the button, one for the div with text 'Comments'
+        button_condition = EC.presence_of_element_located((By.XPATH, "//button[@id='comments']"))
+        div_condition = EC.presence_of_element_located((By.XPATH, "//div[contains(text(), 'Comments')]"))
+
+        # Use WebDriverWait to check for either condition (button or div with text 'Comments')
+        WebDriverWait(driver, 10).until(lambda driver: button_condition(driver) or div_condition(driver))
+
+        print("[✓] Comment section is present.")
         return True
-    except TimeoutException:
+
+    except Exception as e:
+        print(f"[!] Error: {str(e)}")
         return False
 
 
 def try_click_login(driver):
     try:
+        # dismiss_cookie_banner(driver)
         login_xpath = "//*[@id='main-content-video_detail']/div/div[2]/div[2]/div[2]/div[2]/div/div[2]/div/div/div"
         login_bar = WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.XPATH, login_xpath)))
         login_button = login_bar.find_element(By.XPATH, ".//span[contains(text(), 'Log in')]")
         login_button.click()
         print("[✓] Login bar clicked.")
         return True
-    except Exception:
-        print("[~] Login button not found or not clickable.")
+    except Exception as e:
+        print(f"[~] Login button not found or not clickable.: {str(e)}")
         return False
 
 
@@ -485,6 +501,7 @@ def open_other_login_options(driver):
 
 def reopen_comment_section(driver):
     try:
+        random_sleep(5, 7)
         open_comment_section(driver)
         print("[✓] Re-clicked comment button post login.")
     except:
@@ -502,6 +519,96 @@ def send_comment(driver, comment):
         print(f"[+] Comment posted: {comment}")
     except Exception as e:
         print(f"[!] Failed to send comment: {e}")
+
+
+import re
+
+def clean_text(text):
+    # Remove emojis (emoji characters in Unicode)
+    return re.sub(r'[^\w\s,!?\'".-]', '', text)
+
+def send_reply(driver, comment, reply_text):
+    try:
+        # Wait for comments to load and find the target comment
+        comments = WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((
+                By.XPATH, 
+                "//div[contains(@class, 'DivCommentItemWrapper')]//p"
+            )))
+
+        print(f"Able to fetch all comments: {len(comments)}")
+        target = None
+
+        for c in comments:
+            try:
+                cleaned_comment = clean_text(c.text.strip().lower())
+                print(cleaned_comment)
+                if clean_text(comment.strip().lower()) in cleaned_comment:
+                    target = c
+                    print(f"[✓] Comment fetched successfully!")
+                    break
+            except Exception as e:
+                print(f"[!] Error while processing comment: {e}")
+                continue
+
+        if not target:
+            print(f"[✖] Could not find the comment: '{comment}'")
+            time.sleep(10)
+            return
+
+        # Re-find the reply button within the target comment block
+        reply_button = target.find_element(
+            By.XPATH,
+            ".//ancestor::div[contains(@class, 'DivCommentItemWrapper')]//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
+        )
+        
+        # Scroll into view to make sure it's clickable
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", reply_button)
+        
+        # Click the reply button
+        random_sleep(1, 2)
+        reply_button.click()
+        print("[✓] Reply button clicked.")
+        
+        # Wait a bit for the input box to appear (may involve DOM change)
+        random_sleep(2, 3)
+        
+        # Re-locate the input box right before interacting with it
+        input_box = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//div[@data-e2e='comment-input']//div[@contenteditable='true']")
+            )
+        )
+        
+        # Ensure the input box is in a fresh state (re-fetch the input box)
+        input_box.send_keys(reply_text)
+        print("Reply text inserted")
+
+        random_sleep(5, 7)
+        post_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable(
+                (By.XPATH, "//div[@aria-label='Post' and @role='button' and contains(@data-e2e, 'comment-post')]")
+            )
+        )
+        driver.execute_script("""
+            document.body.style.overflow = 'hidden';  // Disable scrolling on the body
+        """)
+
+
+        driver.execute_script("""
+            var postButton = arguments[0];
+            postButton.scrollIntoView({block: 'center', behavior: 'auto'});
+            postButton.click();
+        """, post_button)
+        print("[✓] Reply submitted.")
+        
+        random_sleep(5, 7)
+        print(f"[+] Replied with: {reply_text}")
+
+    except Exception as e:
+        print(f"[!] Failed to reply on comment: {e}")
+
+
 
 
 # def close_comment_panel(driver):

@@ -7,7 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from tiktok_captcha_solver import SeleniumSolver
 import undetected_chromedriver as uc
-from helpers import _pause_video_with_spacebar, enter_verification_code, is_comment_section_open, \
+from helpers import pause_video_with_spacebar, enter_verification_code, is_comment_section_open, send_reply, \
                     open_comment_section, open_other_login_options, reopen_comment_section, send_comment, try_click_login, \
                     try_to_like_video, click_random_scroll_button, random_sleep, with_retries, wait_for_captcha_to_clear, \
                     try_to_comment_video, try_to_share_video, safe_action, is_verification_prompt_present, dismiss_cookie_banner
@@ -22,11 +22,20 @@ load_dotenv()
 def perform_login(driver, email, password):
     try:
         WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'phone')]"))
+            EC.element_to_be_clickable((
+                By.XPATH, 
+                "//div[contains(text(), 'Phone') or contains(text(), 'phone')]"
+            ))
         ).click()
 
-        fields_option = driver.find_element(By.XPATH, '//*[@id="loginContainer"]/div[1]/form/div[1]/a')
-        fields_option.click()
+
+        login_link = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((
+                By.XPATH, "//a[contains(text(), 'Log in with email or username')]"
+            ))
+        )
+        login_link.click()
+
 
         print("[*] Waiting for login fields...")
 
@@ -58,7 +67,7 @@ def perform_login(driver, email, password):
 
 
 def handle_after_login(driver, sadcaptcha):
-
+    dismiss_cookie_banner(driver)
     video_count = random.randint(6, 10)
     like_index = random.randint(1, video_count - 2)
     share_index = random.randint(like_index + 1, video_count)
@@ -97,21 +106,33 @@ def handle_after_login(driver, sadcaptcha):
 
 def comment_on_video(driver, comment, sadcaptcha, email, password):
     try:
-        _pause_video_with_spacebar(driver)
+        pause_video_with_spacebar(driver)
         dismiss_cookie_banner(driver)
         open_comment_section(driver)
 
-        if not is_comment_section_open(driver):
+        if is_comment_section_open(driver):
             print("[✖] Comment section failed to open.")
-            return
+            try_click_login(driver)
 
-        if try_click_login(driver):
-            open_other_login_options(driver)
-            with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
-            print("[✓] Login completed.")
-            if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-                print("[✖] CAPTCHA not cleared.")
-                return
+        open_other_login_options(driver)
+        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
+        if is_verification_prompt_present(driver):
+                print("[!] Verification required. Fetching code from email...")
+                random_sleep(2, 5)
+                if not enter_verification_code(driver, email):
+                    print("[✖] Failed to enter verification code.")
+                    return
+                print("[✓] Verification successful, no need to check CAPTCHA.")
+        print("[✓] Login completed.")
+        if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
+            print("[✖] CAPTCHA not cleared.")
+            return
+        print("[*] Waiting for page refresh and comment section to open...")
+        random_sleep(5, 7)
+        
+        # if not is_comment_section_open(driver):
+        #     print("[✖] Comment section failed to open after login.")
+        #     return
 
         reopen_comment_section(driver)
         send_comment(driver, comment)
@@ -120,7 +141,44 @@ def comment_on_video(driver, comment, sadcaptcha, email, password):
         print(f"[!] pause_video failed: {e}")
 
 
-def main(video_url=None, comment=None):
+def reply_on_comment(driver, comment, sadcaptcha, email, password, reply):
+    try:
+        pause_video_with_spacebar(driver)
+        dismiss_cookie_banner(driver)
+        open_comment_section(driver)
+
+        if is_comment_section_open(driver):
+            print("[✖] Comment section failed to open.")
+            try_click_login(driver)
+
+        open_other_login_options(driver)
+        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
+        if is_verification_prompt_present(driver):
+                print("[!] Verification required. Fetching code from email...")
+                random_sleep(2, 5)
+                if not enter_verification_code(driver, email):
+                    print("[✖] Failed to enter verification code.")
+                    return
+                print("[✓] Verification successful, no need to check CAPTCHA.")
+        print("[✓] Login completed.")
+        if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
+            print("[✖] CAPTCHA not cleared.")
+            return
+        print("[*] Waiting for page refresh and comment section to open...")
+        random_sleep(5, 7)
+        
+        # if not is_comment_section_open(driver):
+        #     print("[✖] Comment section failed to open after login.")
+        #     return
+
+        reopen_comment_section(driver)
+        send_reply(driver, comment, reply)
+
+    except Exception as e:
+        print(f"[!] pause_video failed: {e}")
+
+
+def main(video_url=None, comment=None, reply=None):
     driver = None
     try:
         driver = uc.Chrome(headless=False)
@@ -134,8 +192,12 @@ def main(video_url=None, comment=None):
         password = "Tech@123$$$"
         if video_url and comment:
             driver.get(video_url)
+            
             random_sleep(5, 7)
-            comment_on_video(driver, comment, sadcaptcha, email, password)
+            if reply is None:
+                comment_on_video(driver, comment, sadcaptcha, email, password)
+            else:
+                reply_on_comment(driver, comment, sadcaptcha, email, password, reply)
         else:
             driver.get("https://www.tiktok.com/login")
             random_sleep(2, 5)
@@ -171,5 +233,6 @@ def main(video_url=None, comment=None):
             driver.quit()
 
 if __name__ == "__main__":
-    main()
-    # main(video_url="https://www.tiktok.com/@pet.babylover88/video/7480131003374259502?is_from_webapp=1&sender_device=pc", comment="Nice!")
+    # main()
+    main(video_url="https://www.tiktok.com/@pet.babylover88/video/7480131003374259502?is_from_webapp=1&sender_device=pc", 
+         comment="This isnt funny 💔", reply= "True That!!")
