@@ -233,6 +233,6 @@ def main(video_url=None, comment=None, reply=None):
             driver.quit()
 
 if __name__ == "__main__":
-    # main()
-    main(video_url="https://www.tiktok.com/@pet.babylover88/video/7480131003374259502?is_from_webapp=1&sender_device=pc", 
-         comment="This isnt funny 💔", reply= "True That!!")
+    main()
+    # main(video_url="https://www.tiktok.com/@pet.babylover88/video/7480131003374259502?is_from_webapp=1&sender_device=pc", 
+    #      comment="This isnt funny 💔", reply= "True That!!")
