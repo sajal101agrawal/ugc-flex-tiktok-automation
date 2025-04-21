@@ -511,11 +511,15 @@ def reopen_comment_section(driver):
 def send_comment(driver, comment):
     try:
         input_box = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true']"))
+            EC.presence_of_element_located(
+                (By.XPATH, "//div[@data-e2e='comment-input']//div[@contenteditable='true']")
+            )
         )
+
         input_box.send_keys(comment)
-        random_sleep(1, 2)
-        input_box.send_keys(Keys.ENTER)
+        random_sleep(3,5)
+        post_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[data-e2e='comment-post']")))
+        post_button.click()
         print(f"[+] Comment posted: {comment}")
     except Exception as e:
         print(f"[!] Failed to send comment: {e}")
@@ -557,6 +561,7 @@ def send_reply(driver, comment, reply_text):
             return
 
         # Re-find the reply button within the target comment block
+        
         reply_button = target.find_element(
             By.XPATH,
             ".//ancestor::div[contains(@class, 'DivCommentItemWrapper')]//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
@@ -585,21 +590,9 @@ def send_reply(driver, comment, reply_text):
         print("Reply text inserted")
 
         random_sleep(5, 7)
-        post_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//div[@aria-label='Post' and @role='button' and contains(@data-e2e, 'comment-post')]")
-            )
-        )
-        driver.execute_script("""
-            document.body.style.overflow = 'hidden';  // Disable scrolling on the body
-        """)
+        post_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[data-e2e='comment-post']")))
+        post_button.click()
 
-
-        driver.execute_script("""
-            var postButton = arguments[0];
-            postButton.scrollIntoView({block: 'center', behavior: 'auto'});
-            postButton.click();
-        """, post_button)
         print("[✓] Reply submitted.")
         
         random_sleep(5, 7)

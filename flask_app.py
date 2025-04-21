@@ -1,12 +1,7 @@
-from TikTokApi import TikTokApi
 from flask import Flask, request, jsonify
 from main import main
 
 app = Flask(__name__)
-
-# Initialize TikTokApi
-# api = TikTokApi.get_instance()
-
 
 @app.route('/add_comment', methods=['POST'])
 def add_comment():
