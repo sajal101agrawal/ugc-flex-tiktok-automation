@@ -1,0 +1,85 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # Ensure you're using the latest checkout action
+
+      - name: Copy files to EC2 (exclude env, media, etc.)
+        uses: appleboy/scp-action@v0.1.3
+        with:
+          host: ${{ secrets.AWS_IP }}
+          username: ${{ secrets.AWS_SSH_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}  # Secret for EC2 SSH
+          source: |
+            ./  
+          target: "/home/ubuntu/ugc-flex-tiktok-data"
+          scp_ignore: |
+            env/
+            media/
+            staticfiles/
+            .git/
+            .venv/
+      
+      - name: SSH and deploy on EC2
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.AWS_IP }}
+          username: ${{ secrets.AWS_SSH_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            set -e  # Exit immediately if a command exits with a non-zero status
+            # Log deployment start time
+            echo "Deployment started at $(date)" >> deploy.log
+            
+            # Backup existing app with rsync (better than cp for large projects)
+            BACKUP_DIR="/home/ubuntu/ugc-flex-tiktok-data-backup"
+            if [ -d "$BACKUP_DIR" ]; then
+              echo "Removing old backup" >> deploy.log
+              rm -rf "$BACKUP_DIR"
+            fi
+            echo "Creating new backup" >> deploy.log
+            rsync -av --delete /home/ubuntu/ugc-flex-tiktok-data/ "$BACKUP_DIR/"
+            
+            # Navigate to app directory
+            cd /home/ubuntu/ugc-flex-tiktok-data
+            
+            # Stash changes and pull the latest code
+            git stash || { echo "Git stash failed, rolling back"; exit 1; }
+            git pull origin master || { echo "Git pull failed, rolling back"; exit 1; }
+            
+            # Activate virtual environment and install dependencies with conflict handling
+            source env/bin/activate  # Activate virtual environment
+
+            pip install -r requirements.txt
+
+            # Restart Gunicorn and Nginx services
+            sudo systemctl restart gunicorn || { echo "Gunicorn restart failed, rolling back"; exit 1; }
+            sudo systemctl restart nginx || { echo "Nginx restart failed, rolling back"; exit 1; }
+
+            # Log success
+            echo "Deployment succeeded at $(date)" >> deploy.log
+      
+      - name: Rollback if deployment fails
+        if: failure()
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.AWS_IP }}
+          username: ${{ secrets.AWS_SSH_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            echo "Deployment failed, rolling back at $(date)" >> deploy.log
+            # Restore the backup using rsync for better safety
+            rsync -av --delete /home/ubuntu/ugc-flex-tiktok-data-backup/ /home/ubuntu/ugc-flex-tiktok-data/
+            # Restart services
+            sudo systemctl restart gunicorn || echo "Gunicorn restart failed after rollback" >> deploy.log
+            sudo systemctl restart nginx || echo "Nginx restart failed after rollback" >> deploy.log
+            echo "Rollback completed at $(date)" >> deploy.log
