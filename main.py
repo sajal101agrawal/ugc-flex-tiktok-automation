@@ -104,7 +104,7 @@ def handle_after_login(driver, sadcaptcha):
         random_sleep(3, 5)
 
 
-def comment_on_video(driver, comment, sadcaptcha, email, password):
+def comment_on_video(driver, comment, sadcaptcha, email, password, video_url):
     try:
         pause_video_with_spacebar(driver)
         dismiss_cookie_banner(driver)
@@ -133,6 +133,10 @@ def comment_on_video(driver, comment, sadcaptcha, email, password):
         # if not is_comment_section_open(driver):
         #     print("[✖] Comment section failed to open after login.")
         #     return
+        if video_url not in driver.current_url:
+            print(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
+            driver.execute_script(f"window.location.href = '{video_url}';")
+            random_sleep(5, 7)
 
         reopen_comment_section(driver)
         send_comment(driver, comment)
@@ -141,7 +145,7 @@ def comment_on_video(driver, comment, sadcaptcha, email, password):
         print(f"[!] pause_video failed: {e}")
 
 
-def reply_on_comment(driver, comment, sadcaptcha, email, password, reply):
+def reply_on_comment(driver, comment, sadcaptcha, email, password, reply, video_url):
     try:
         pause_video_with_spacebar(driver)
         dismiss_cookie_banner(driver)
@@ -166,11 +170,14 @@ def reply_on_comment(driver, comment, sadcaptcha, email, password, reply):
             return
         print("[*] Waiting for page refresh and comment section to open...")
         random_sleep(5, 7)
-        
         # if not is_comment_section_open(driver):
         #     print("[✖] Comment section failed to open after login.")
         #     return
 
+        if video_url not in driver.current_url:
+            print(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
+            driver.execute_script(f"window.location.href = '{video_url}';")
+            random_sleep(5, 7)
         reopen_comment_section(driver)
         send_reply(driver, comment, reply)
 
@@ -181,7 +188,7 @@ def reply_on_comment(driver, comment, sadcaptcha, email, password, reply):
 def main(video_url=None, comment=None, reply=None):
     driver = None
     try:
-        driver = uc.Chrome(headless=False)
+        driver = uc.Chrome(headless=True)
         driver.maximize_window()
 
         api_key = "ca73e4fdf55a63b83ecfff3194754775"
@@ -190,40 +197,44 @@ def main(video_url=None, comment=None, reply=None):
         # email = "japdavev5@gmail.com"
         email = os.getenv("UNAME")
         password = "Tech@123$$$"
-        if video_url and comment:
-            driver.get(video_url)
-            
-            random_sleep(5, 7)
-            if reply is None:
-                comment_on_video(driver, comment, sadcaptcha, email, password)
-            else:
-                reply_on_comment(driver, comment, sadcaptcha, email, password, reply)
-        else:
-            driver.get("https://www.tiktok.com/login")
+        driver.get("https://www.tiktok.com/login")
+        random_sleep(2, 5)
+        sadcaptcha.solve_captcha_if_present()
+
+        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
+
+        if is_verification_prompt_present(driver):
+            print("[!] Verification required. Fetching code from email...")
             random_sleep(2, 5)
-            sadcaptcha.solve_captcha_if_present()
+            if not enter_verification_code(driver, email):
+                print("[✖] Failed to enter verification code.")
+                return
+            print("[✓] Verification successful, no need to check CAPTCHA.")
 
-            with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
+        # else:
+        #     if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
+        #         print("[✖] CAPTCHA was not cleared. Aborting.")
+        #         return
 
-            if is_verification_prompt_present(driver):
-                print("[!] Verification required. Fetching code from email...")
-                random_sleep(2, 5)
-                if not enter_verification_code(driver, email):
-                    print("[✖] Failed to enter verification code.")
-                    return
-                print("[✓] Verification successful, no need to check CAPTCHA.")
+        try:
+            WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)
+            print(f"[✓] Redirected to {driver.current_url}. Login successful.")
+            # handle_after_login(driver, sadcaptcha)
+            if video_url and comment:
+                driver.execute_script(f"window.location.href = '{video_url}';")
+                reopen_comment_section(driver)
 
-            # else:
-            #     if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-            #         print("[✖] CAPTCHA was not cleared. Aborting.")
-            #         return
-
-            try:
-                WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)
-                print(f"[✓] Redirected to {driver.current_url}. Login successful.")
+                random_sleep(5, 7)
+                if reply is None:
+                    # reopen_comment_section(driver)
+                    send_comment(driver, comment)
+                else:
+                    send_reply(driver, comment, reply)
+            else:
                 handle_after_login(driver, sadcaptcha)
-            except TimeoutException:
-                print(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
+            random_sleep(5, 7)
+        except TimeoutException:
+            print(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
 
     except Exception as e:
         print(f"[!] Main error: {e}")
