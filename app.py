@@ -14,7 +14,9 @@ def setup_driver():
     user_agent = ua.random
     chrome_options.add_argument(f"user-agent={user_agent}")
 
-    driver = webdriver.Chrome(options=chrome_options)
+    service = Service('/usr/local/bin/chromedriver')
+
+    driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
 def auto_scroll(driver, duration=60):
