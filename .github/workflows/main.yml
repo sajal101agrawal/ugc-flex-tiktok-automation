@@ -54,7 +54,7 @@ jobs:
             
             # Stash changes and pull the latest code
             git stash || { echo "Git stash failed, rolling back"; exit 1; }
-            git pull origin master || { echo "Git pull failed, rolling back"; exit 1; }
+            git pull origin main || { echo "Git pull failed, rolling back"; exit 1; }
             
             # Activate virtual environment and install dependencies with conflict handling
             source env/bin/activate  # Activate virtual environment
