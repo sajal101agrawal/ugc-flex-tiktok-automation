@@ -201,8 +201,8 @@ def main(video_url=None, comment=None, reply=None):
         api_key = "ca73e4fdf55a63b83ecfff3194754775"
         sadcaptcha = SeleniumSolver(driver, api_key, mouse_step_size=1, mouse_step_delay_ms=20)
 
-        # email = "japdavev5@gmail.com"
-        email = os.getenv("UNAME")
+        email = "japdavev5@gmail.com"
+        # email = os.getenv("UNAME")
         password = "Tech@123$$$"
         driver.get("https://www.tiktok.com/login")
         random_sleep(2, 5)
