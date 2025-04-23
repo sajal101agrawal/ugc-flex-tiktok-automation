@@ -14,10 +14,17 @@ from helpers import pause_video_with_spacebar, enter_verification_code, is_comme
 from dotenv import load_dotenv
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+import logging
 
 
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 def perform_login(driver, email, password):
     try:
@@ -37,7 +44,7 @@ def perform_login(driver, email, password):
         login_link.click()
 
 
-        print("[*] Waiting for login fields...")
+        logger.info("[*] Waiting for login fields...")
 
         username_input = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "//input[@name='username']"))
@@ -56,13 +63,13 @@ def perform_login(driver, email, password):
         )
         login_btn.click()
 
-        print("[+] Login attempted. Waiting for response...")
+        logger.info("[+] Login attempted. Waiting for response...")
         random_sleep(3, 5)
     except TimeoutException:
-        print("[!] Login timeout. Please check credentials or complete login manually.")
+        logger.info("[!] Login timeout. Please check credentials or complete login manually.")
         raise
     except Exception as e:
-        print(f"[!] Login error: {e}")
+        logger.info(f"[!] Login error: {e}")
         raise
 
 
@@ -78,10 +85,10 @@ def handle_after_login(driver, sadcaptcha):
     scroll_up_count = 0
 
     for i in range(video_count):
-        print(f"\n[*] Watching video {i + 1}/{video_count}")
+        logger.info(f"\n[*] Watching video {i + 1}/{video_count}")
         
         random_sleep(10, 15)
-        print(i)
+        logger.info(i)
         if i == like_index:
             safe_action(driver, sadcaptcha, try_to_like_video)
 
@@ -93,13 +100,13 @@ def handle_after_login(driver, sadcaptcha):
 
         success, scroll_up_count = click_random_scroll_button(driver, scroll_up_count)
         if not success:
-            print("[!] Fallback to JS scroll.")
+            logger.info("[!] Fallback to JS scroll.")
             direction = -1 if scroll_up_count < 2 and random.random() < 0.3 else 1
             pixels = random.randint(500, 1000) * direction
             driver.execute_script(f"window.scrollBy(0, {pixels});")
             if direction < 0:
                 scroll_up_count += 1
-            print(f"[~] JS scrolled {'up' if direction < 0 else 'down'}.")
+            logger.info(f"[~] JS scrolled {'up' if direction < 0 else 'down'}.")
 
         random_sleep(3, 5)
 
@@ -111,30 +118,30 @@ def comment_on_video(driver, comment, sadcaptcha, email, password, video_url):
         open_comment_section(driver)
 
         if is_comment_section_open(driver):
-            print("[✖] Comment section failed to open.")
+            logger.info("[✖] Comment section failed to open.")
             try_click_login(driver)
 
         open_other_login_options(driver)
         with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
         if is_verification_prompt_present(driver):
-                print("[!] Verification required. Fetching code from email...")
+                logger.info("[!] Verification required. Fetching code from email...")
                 random_sleep(2, 5)
                 if not enter_verification_code(driver, email):
-                    print("[✖] Failed to enter verification code.")
+                    logger.info("[✖] Failed to enter verification code.")
                     return
-                print("[✓] Verification successful, no need to check CAPTCHA.")
-        print("[✓] Login completed.")
+                logger.info("[✓] Verification successful, no need to check CAPTCHA.")
+        logger.info("[✓] Login completed.")
         if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-            print("[✖] CAPTCHA not cleared.")
+            logger.info("[✖] CAPTCHA not cleared.")
             return
-        print("[*] Waiting for page refresh and comment section to open...")
+        logger.info("[*] Waiting for page refresh and comment section to open...")
         random_sleep(5, 7)
         
         # if not is_comment_section_open(driver):
-        #     print("[✖] Comment section failed to open after login.")
+        #     logger.info("[✖] Comment section failed to open after login.")
         #     return
         if video_url not in driver.current_url:
-            print(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
+            logger.info(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
             driver.execute_script(f"window.location.href = '{video_url}';")
             random_sleep(5, 7)
 
@@ -142,7 +149,7 @@ def comment_on_video(driver, comment, sadcaptcha, email, password, video_url):
         send_comment(driver, comment)
 
     except Exception as e:
-        print(f"[!] pause_video failed: {e}")
+        logger.info(f"[!] pause_video failed: {e}")
 
 
 def reply_on_comment(driver, comment, sadcaptcha, email, password, reply, video_url):
@@ -152,37 +159,37 @@ def reply_on_comment(driver, comment, sadcaptcha, email, password, reply, video_
         open_comment_section(driver)
 
         if is_comment_section_open(driver):
-            print("[✖] Comment section failed to open.")
+            logger.info("[✖] Comment section failed to open.")
             try_click_login(driver)
 
         open_other_login_options(driver)
         with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
         if is_verification_prompt_present(driver):
-                print("[!] Verification required. Fetching code from email...")
+                logger.info("[!] Verification required. Fetching code from email...")
                 random_sleep(2, 5)
                 if not enter_verification_code(driver, email):
-                    print("[✖] Failed to enter verification code.")
+                    logger.info("[✖] Failed to enter verification code.")
                     return
-                print("[✓] Verification successful, no need to check CAPTCHA.")
-        print("[✓] Login completed.")
+                logger.info("[✓] Verification successful, no need to check CAPTCHA.")
+        logger.info("[✓] Login completed.")
         if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-            print("[✖] CAPTCHA not cleared.")
+            logger.info("[✖] CAPTCHA not cleared.")
             return
-        print("[*] Waiting for page refresh and comment section to open...")
+        logger.info("[*] Waiting for page refresh and comment section to open...")
         random_sleep(5, 7)
         # if not is_comment_section_open(driver):
-        #     print("[✖] Comment section failed to open after login.")
+        #     logger.info("[✖] Comment section failed to open after login.")
         #     return
 
         if video_url not in driver.current_url:
-            print(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
+            logger.info(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
             driver.execute_script(f"window.location.href = '{video_url}';")
             random_sleep(5, 7)
         reopen_comment_section(driver)
         send_reply(driver, comment, reply)
 
     except Exception as e:
-        print(f"[!] pause_video failed: {e}")
+        logger.info(f"[!] pause_video failed: {e}")
 
 
 def main(video_url=None, comment=None, reply=None):
@@ -204,21 +211,21 @@ def main(video_url=None, comment=None, reply=None):
         with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
 
         if is_verification_prompt_present(driver):
-            print("[!] Verification required. Fetching code from email...")
+            logger.info("[!] Verification required. Fetching code from email...")
             random_sleep(2, 5)
             if not enter_verification_code(driver, email):
-                print("[✖] Failed to enter verification code.")
+                logger.info("[✖] Failed to enter verification code.")
                 return
-            print("[✓] Verification successful, no need to check CAPTCHA.")
+            logger.info("[✓] Verification successful, no need to check CAPTCHA.")
 
         # else:
         #     if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-        #         print("[✖] CAPTCHA was not cleared. Aborting.")
+        #         logger.info("[✖] CAPTCHA was not cleared. Aborting.")
         #         return
 
         try:
             WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)
-            print(f"[✓] Redirected to {driver.current_url}. Login successful.")
+            logger.info(f"[✓] Redirected to {driver.current_url}. Login successful.")
             # handle_after_login(driver, sadcaptcha)
             if video_url and comment:
                 driver.execute_script(f"window.location.href = '{video_url}';")
@@ -234,10 +241,10 @@ def main(video_url=None, comment=None, reply=None):
                 handle_after_login(driver, sadcaptcha)
             random_sleep(5, 7)
         except TimeoutException:
-            print(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
+            logger.info(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
 
     except Exception as e:
-        print(f"[!] Main error: {e}")
+        logger.info(f"[!] Main error: {e}")
     finally:
         if driver:
 
