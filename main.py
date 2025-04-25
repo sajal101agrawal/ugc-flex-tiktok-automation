@@ -191,6 +191,34 @@ def reply_on_comment(driver, comment, sadcaptcha, email, password, reply, video_
     except Exception as e:
         logger.info(f"[!] pause_video failed: {e}")
 
+from selenium.webdriver.support.ui import WebDriverWait
+import pickle
+from selenium.common.exceptions import TimeoutException, WebDriverException
+
+
+def load_cookies(driver, cookies_path=os.getenv("COOKIE_PATH")):
+    if not os.path.exists(cookies_path):
+        return False
+
+    try:
+        driver.get("https://www.tiktok.com")
+        with open(cookies_path, "rb") as f:
+            cookies = pickle.load(f)
+
+        for cookie in cookies:
+            if "sameSite" in cookie and cookie["sameSite"] not in ["Strict", "Lax", "None"]:
+                del cookie["sameSite"]
+            try:
+                driver.add_cookie(cookie)
+            except WebDriverException as e:
+                print(f"[!] Cookie error: {e}")
+
+        driver.refresh()
+        return True
+    except Exception as e:
+        print(f"[!] Failed to load cookies: {e}")
+        return False
+
 
 def main(video_url=None, comment=None, reply=None):
     driver = None
@@ -201,54 +229,59 @@ def main(video_url=None, comment=None, reply=None):
         api_key = "ca73e4fdf55a63b83ecfff3194754775"
         sadcaptcha = SeleniumSolver(driver, api_key, mouse_step_size=1, mouse_step_delay_ms=20)
 
-        email = "japdavev5@gmail.com"
-        # email = os.getenv("UNAME")
+        # email = "japdavev5@gmail.com"
+        email = os.getenv("UNAME")
         password = "Tech@123$$$"
-        driver.get("https://www.tiktok.com/login")
-        random_sleep(2, 5)
-        sadcaptcha.solve_captcha_if_present()
-
-        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
-
-        if is_verification_prompt_present(driver):
-            logger.info("[!] Verification required. Fetching code from email...")
+        if load_cookies(driver):
+            logger.info("[✓] Cookies loaded. Skipping login.")
+        else:
+            logger.info("[!] No valid cookies found. Proceeding with login.")
+            driver.get("https://www.tiktok.com/login")
             random_sleep(2, 5)
-            if not enter_verification_code(driver, email):
-                logger.info("[✖] Failed to enter verification code.")
-                return
-            logger.info("[✓] Verification successful, no need to check CAPTCHA.")
+            sadcaptcha.solve_captcha_if_present()
 
-        # else:
-        #     if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-        #         logger.info("[✖] CAPTCHA was not cleared. Aborting.")
-        #         return
+            with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
 
-        try:
+            if is_verification_prompt_present(driver):
+                logger.info("[!] Verification required. Fetching code from email...")
+                random_sleep(2, 5)
+                if not enter_verification_code(driver, email):
+                    logger.info("[✖] Failed to enter verification code.")
+                    return
+                logger.info("[✓] Verification successful.")
+
             WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)
-            logger.info(f"[✓] Redirected to {driver.current_url}. Login successful.")
-            # handle_after_login(driver, sadcaptcha)
-            if video_url and comment:
-                driver.execute_script(f"window.location.href = '{video_url}';")
-                reopen_comment_section(driver)
+            logger.info(f"[✓] Login successful. Current URL: {driver.current_url}")
 
-                random_sleep(5, 7)
-                if reply is None:
-                    # reopen_comment_section(driver)
-                    send_comment(driver, comment)
-                else:
-                    send_reply(driver, comment, reply)
-            else:
-                handle_after_login(driver, sadcaptcha)
+            # ✅ Save cookies after successful login
+            with open("tiktok_cookies.pkl", "wb") as f:
+                pickle.dump(driver.get_cookies(), f)
+
+        # 🧠 Already logged in — proceed with your automation
+        if video_url and comment:
+            driver.execute_script(f"window.location.href = '{video_url}';")
+            reopen_comment_section(driver)
+
             random_sleep(5, 7)
-        except TimeoutException:
-            logger.info(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
+            if reply is None:
+                # send_comment(driver, comment)
+                safe_action(driver, sadcaptcha, send_comment, comment)
+            else:
+                # send_reply(driver, comment, reply)
+                safe_action(driver, sadcaptcha, send_reply, comment, reply)
+        else:
+            handle_after_login(driver, sadcaptcha)
 
+        random_sleep(5, 7)
+
+    except TimeoutException:
+        logger.info(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
     except Exception as e:
         logger.info(f"[!] Main error: {e}")
     finally:
         if driver:
-
             driver.quit()
+
 
 if __name__ == "__main__":
     main(video_url=None, comment=None, reply=None)

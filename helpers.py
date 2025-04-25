@@ -579,20 +579,33 @@ def send_reply(driver, comment, reply_text):
         random_sleep(2, 3)
         
         # Re-locate the input box right before interacting with it
-        input_box = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//div[@data-e2e='comment-input']//div[@contenteditable='true']")
-            )
-        )
-        
-        # Ensure the input box is in a fresh state (re-fetch the input box)
+        # input_box = WebDriverWait(driver, 10).until(
+        #     EC.presence_of_element_located(
+        #         (By.XPATH, "//div[@data-e2e='comment-input']//div[@contenteditable='true' and contains(text(), 'Add a reply')]")
+        #     )
+        # )
+
+        input_box = driver.switch_to.active_element 
         input_box.send_keys(reply_text)
         print("Reply text inserted")
-
         random_sleep(5, 7)
-        post_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[data-e2e='comment-post']")))
-        post_button.click()
+        reply_containers = driver.find_elements(
+            By.XPATH,
+            "//div[contains(@class, 'DivReplyContainer') or contains(@class, 'DivReplyCommentEditorContainer')]"
+        )
 
+        for container in reply_containers:
+            try:
+                post_button = container.find_element(By.XPATH, ".//div[@data-e2e='comment-post' and @aria-disabled='false']")
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
+                post_button.click()
+                break
+            except:
+                continue
+
+
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
+        # post_button.click()
         print("[✓] Reply submitted.")
         
         random_sleep(5, 7)
@@ -600,6 +613,10 @@ def send_reply(driver, comment, reply_text):
 
     except Exception as e:
         print(f"[!] Failed to reply on comment: {e}")
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        screenshot_path = f"error_reply_{timestamp}.png"
+        driver.save_screenshot(screenshot_path)
+        print(f"[!] Screenshot saved as: {screenshot_path}")
 
 
 
