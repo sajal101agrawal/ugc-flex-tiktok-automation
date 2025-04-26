@@ -571,14 +571,12 @@ def send_comment(driver, comment):
         # logger.error(message)
         print(message)
         return False, message
-        
 
-
-import re
 
 def clean_text(text):
     # Remove emojis (emoji characters in Unicode)
     return re.sub(r'[^\w\s,!?\'".-]', '', text)
+
 
 def send_reply(driver, comment, reply_text):
     try:
@@ -613,8 +611,6 @@ def send_reply(driver, comment, reply_text):
             time.sleep(10)
             return False, message
 
-        # Re-find the reply button within the target comment block
-        comment_position = target.location
         reply_button = target.find_element(
             By.XPATH,
             ".//ancestor::div[contains(@class, 'DivCommentItemWrapper')]//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
@@ -631,15 +627,8 @@ def send_reply(driver, comment, reply_text):
         
         # Wait a bit for the input box to appear (may involve DOM change)
         random_sleep(2, 3)
-        
-        # Re-locate the input box right before interacting with it
-        # input_box = WebDriverWait(driver, 10).until(
-        #     EC.presence_of_element_located(
-        #         (By.XPATH, "//div[@data-e2e='comment-input']//div[@contenteditable='true' and contains(text(), 'Add a reply')]")
-        #     )
-        # )
 
-        input_box = driver.switch_to.active_element 
+        input_box = driver.switch_to.active_element
         driver.execute_script("arguments[0].focus();", input_box)
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
@@ -683,21 +672,6 @@ def send_reply(driver, comment, reply_text):
         return False, message
 
 
-
-
-# def close_comment_panel(driver):
-#     try:
-#         xpath = (
-#             "//button[@role='button' and @aria-label='Close' and @data-e2e='browse-close']"
-#             " | //button[@aria-label='exit']"
-#         )
-#         close_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xpath)))
-#         close_btn.click()
-#         print("[✓] Closed comment panel.")
-#     except Exception as e:
-#         print(f"[!] Could not close comment panel: {e}")
-
-
 def dismiss_cookie_banner(driver):
     try:
         print("GET COOKIE BANNER")
@@ -722,3 +696,4 @@ def dismiss_cookie_banner(driver):
             print("[~] Could not find or click 'Decline optional cookies' via JS.")
     except Exception as e:
         print(f"[✖] Error dismissing cookie banner: {e}")
+

@@ -121,106 +121,12 @@ def handle_after_login(driver, sadcaptcha):
         random_sleep(3, 5)
 
 
-def comment_on_video(driver, comment, sadcaptcha, email, password, video_url):
-    try:
-        pause_video_with_spacebar(driver)
-        dismiss_cookie_banner(driver)
-        open_comment_section(driver)
-
-        if is_comment_section_open(driver):
-            logger.info("[✖] Comment section failed to open.")
-            try_click_login(driver)
-
-        open_other_login_options(driver)
-        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
-        if is_verification_prompt_present(driver):
-                logger.info("[!] Verification required. Fetching code from email...")
-                random_sleep(2, 5)
-                if not enter_verification_code(driver, email):
-                    logger.info("[✖] Failed to enter verification code.")
-                    return
-                logger.info("[✓] Verification successful, no need to check CAPTCHA.")
-        logger.info("[✓] Login completed.")
-        if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-            logger.info("[✖] CAPTCHA not cleared.")
-            return
-        logger.info("[*] Waiting for page refresh and comment section to open...")
-        random_sleep(5, 7)
-        
-        # if not is_comment_section_open(driver):
-        #     logger.info("[✖] Comment section failed to open after login.")
-        #     return
-        if video_url not in driver.current_url:
-            logger.info(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
-            driver.execute_script(f"window.location.href = '{video_url}';")
-            random_sleep(5, 7)
-
-        reopen_comment_section(driver)
-        send_comment(driver, comment)
-
-    except Exception as e:
-        logger.info(f"[!] pause_video failed: {e}")
-
-
-def reply_on_comment(driver, comment, sadcaptcha, email, password, reply, video_url):
-    try:
-        pause_video_with_spacebar(driver)
-        dismiss_cookie_banner(driver)
-        open_comment_section(driver)
-
-        if is_comment_section_open(driver):
-            logger.info("[✖] Comment section failed to open.")
-            try_click_login(driver)
-
-        open_other_login_options(driver)
-        with_retries(lambda: safe_action(driver, sadcaptcha, perform_login, email, password))
-        if is_verification_prompt_present(driver):
-                logger.info("[!] Verification required. Fetching code from email...")
-                random_sleep(2, 5)
-                if not enter_verification_code(driver, email):
-                    logger.info("[✖] Failed to enter verification code.")
-                    return
-                logger.info("[✓] Verification successful, no need to check CAPTCHA.")
-        logger.info("[✓] Login completed.")
-        if not wait_for_captcha_to_clear(driver, sadcaptcha, timeout=120):
-            logger.info("[✖] CAPTCHA not cleared.")
-            return
-        logger.info("[*] Waiting for page refresh and comment section to open...")
-        random_sleep(5, 7)
-        # if not is_comment_section_open(driver):
-        #     logger.info("[✖] Comment section failed to open after login.")
-        #     return
-
-        if video_url not in driver.current_url:
-            logger.info(f"[!] Redirected to {driver.current_url}. Navigating back to video via JS...")
-            driver.execute_script(f"window.location.href = '{video_url}';")
-            random_sleep(5, 7)
-        reopen_comment_section(driver)
-        send_reply(driver, comment, reply)
-
-    except Exception as e:
-        logger.info(f"[!] pause_video failed: {e}")
-
-
-
-def get_random_proxy():
-    # Randomly select a full proxy URL
-    proxies = [
-        "134.35.190.136:8080",  # Example proxy IP
-    "8.219.1.139:8090",     # Another example proxy IP
-    "91.107.86.207:3141",   # Another example proxy IP
-    "1.4.251.176:8080" 
-    ]
-    return random.choice(proxies)
-
-
-def load_cookies(driver, cookies_path="/home/ubuntu/tiktok_cookies.pkl"):
+def load_cookies(driver, cookies_path=os.getenv("COOKIE_PATH")):
     if not os.path.exists(cookies_path):
         return False
 
     try:
         driver.get("https://www.tiktok.com")
-        # driver.get("https://www.google.com")
         with open(cookies_path, "rb") as f:
             cookies = pickle.load(f)
         for cookie in cookies:
@@ -242,25 +148,25 @@ def load_cookies(driver, cookies_path="/home/ubuntu/tiktok_cookies.pkl"):
 def main(video_url=None, comment=None, reply=None):
     driver = None
     try:
-        #driver = uc.Chrome(headless=True)
-        chromedriver_path = "/usr/bin/chromedriver"
+        driver = uc.Chrome(headless=True)
+        # chromedriver_path = "/usr/bin/chromedriver"
         # os.environ["DISPLAY"] = ":1"  # Or set to :99 if you're using that
         # os.environ["DISPLAY"] = ":99"
 
-        options = Options()
-        options.headless = True
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--remote-debugging-port=9223")
-        options.binary_location = "/usr/bin/google-chrome-stable"
-        driver = uc.Chrome(executable_path=chromedriver_path, options=options)
+        # options = Options()
+        # options.headless = False
+        # options.add_argument("--no-sandbox")
+        # options.add_argument("--disable-gpu")
+        # options.add_argument("--remote-debugging-port=9223")
+        # options.binary_location = "/usr/bin/google-chrome-stable"
+        # driver = uc.Chrome(executable_path=chromedriver_path, options=options)
         # driver = uc.Chrome(options=options)
-        # driver.maximize_window()
+        driver.maximize_window()
 
         api_key = "ca73e4fdf55a63b83ecfff3194754775"
         sadcaptcha = SeleniumSolver(driver, api_key, mouse_step_size=1, mouse_step_delay_ms=20)
-        email = "japdavev5@gmail.com"
-      #  email = os.getenv("UNAME")
+        # email = "japdavev5@gmail.com"
+        email = os.getenv("UNAME")
         password = "Tech@123$$$"
         if load_cookies(driver):
             print("[✓] Cookies loaded. Skipping login.")
@@ -294,11 +200,9 @@ def main(video_url=None, comment=None, reply=None):
             random_sleep(5, 7)
             if reply is None:
                 reopen_comment_section(driver, comment)
-                # send_comment(driver, comment)
                 status, message = safe_action(driver, sadcaptcha, send_comment, comment)
             else:
                 reopen_comment_section(driver, reply)
-                # send_reply(driver, comment, reply)
                 status, message = safe_action(driver, sadcaptcha, send_reply, comment, reply)
             return status, message
         else:
@@ -319,5 +223,3 @@ def main(video_url=None, comment=None, reply=None):
 
 if __name__ == "__main__":
     main(video_url=None, comment=None, reply=None)
-    # main(video_url="https://www.tiktok.com/@pet.babylover88/video/7480131003374259502?is_from_webapp=1&sender_device=pc", 
-    #      comment="This isnt funny 💔", reply= "True That!!")
