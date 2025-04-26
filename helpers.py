@@ -14,7 +14,15 @@ import time
 import random
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+import logging
 
+# Configure logging
+# logging.basicConfig(
+#     filename="output.log",  # Set the log file name
+#     level=logging.INFO,  # Log only INFO and above levels
+#     format="%(asctime)s [%(levelname)s] %(message)s"  # Log format
+# )
+# logger = logging.getLogger(__name__)
 
 
 load_dotenv()
@@ -499,9 +507,24 @@ def open_other_login_options(driver):
         print(f"[~] Failed to click 'Other login options': {e}")
 
 
-def reopen_comment_section(driver):
+def reopen_comment_section(driver, comment):
     try:
-        random_sleep(5, 7)
+        random_sleep(2, 4)
+        button_div = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//*[contains(@class, 'DivIconWithRedDotContainer')]"))
+        )
+        button_div.click()
+        search_input = button_div.find_element(By.XPATH, '//*[@id="app"]/div[2]/div/div/div[5]/div[1]/div[2]/form/input')
+        search_input.send_keys(comment)
+        actions = ActionChains(driver)
+        actions.key_down(Keys.CONTROL).send_keys('a').key_up(Keys.CONTROL).perform()  # Select all
+        actions.key_down(Keys.CONTROL).send_keys('c').key_up(Keys.CONTROL).perform()
+        print(f"[✓] Comment copied to clipboard: {comment}")
+        close_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//*[contains(@class, 'TUXButton--secondary') and contains(@aria-label, 'Close')]"))
+        )
+        close_button.click()  # Close the comment section
+        print("[✓] Closed the comment section successfully.")
         open_comment_section(driver)
         print("[✓] Re-clicked comment button post login.")
     except:
@@ -510,19 +533,45 @@ def reopen_comment_section(driver):
 
 def send_comment(driver, comment):
     try:
+        print(f"[DEBUG] comment type: {type(comment)}")
         input_box = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located(
                 (By.XPATH, "//div[@data-e2e='comment-input']//div[@contenteditable='true']")
             )
         )
+        # input_box.click()
+        driver.execute_script("arguments[0].focus();", input_box)
 
-        input_box.send_keys(comment)
+        actions = ActionChains(driver)
+        actions.key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+        # input_box.send_keys(comment)
         random_sleep(3,5)
+    #     driver.execute_script("""
+    # 		const box = document.querySelector("div[data-e2e='comment-input'] div[contenteditable='true']");
+    # 		box.innerText = arguments[0];
+    # 		box.dispatchEvent(new Event('input', { bubbles: true }));
+	# """, comment)
         post_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "div[data-e2e='comment-post']")))
         post_button.click()
-        print(f"[+] Comment posted: {comment}")
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # screenshot_path = f"screenshot_{timestamp}.png"
+        # driver.save_screenshot(screenshot_path)
+        # print(f"[!] Screenshot saved as: {screenshot_path}")
+        message = f"[+] Comment posted: {comment}"
+        print(message)
+        # logger.info(message)
+        return True, message
     except Exception as e:
-        print(f"[!] Failed to send comment: {e}")
+        driver.quit()
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # screenshot_path = f"error_screenshot_{timestamp}.png"
+        # driver.save_screenshot(screenshot_path)
+        # print(f"[!] Screenshot saved as: {screenshot_path}")
+        message = f"[!] Failed to send comment: {e}"
+        # logger.error(message)
+        print(message)
+        return False, message
+        
 
 
 import re
@@ -540,7 +589,7 @@ def send_reply(driver, comment, reply_text):
                 "//div[contains(@class, 'DivCommentItemWrapper')]//p"
             )))
 
-        print(f"Able to fetch all comments: {len(comments)}")
+        # logger.info(f"[✓] Able to fetch all comments: {len(comments)}")
         target = None
 
         for c in comments:
@@ -549,6 +598,7 @@ def send_reply(driver, comment, reply_text):
                 print(cleaned_comment)
                 if clean_text(comment.strip().lower()) in cleaned_comment:
                     target = c
+                    # logger.info(f"[✓] Comment fetched successfully!")
                     print(f"[✓] Comment fetched successfully!")
                     break
             except Exception as e:
@@ -556,12 +606,15 @@ def send_reply(driver, comment, reply_text):
                 continue
 
         if not target:
-            print(f"[✖] Could not find the comment: '{comment}'")
+            driver.quit()
+            message = f"[✖] Could not find the comment: '{comment}'"
+            # logger.error(message)
+            print(message)
             time.sleep(10)
-            return
+            return False, message
 
         # Re-find the reply button within the target comment block
-        
+        comment_position = target.location
         reply_button = target.find_element(
             By.XPATH,
             ".//ancestor::div[contains(@class, 'DivCommentItemWrapper')]//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
@@ -573,6 +626,7 @@ def send_reply(driver, comment, reply_text):
         # Click the reply button
         random_sleep(1, 2)
         reply_button.click()
+        # logger.info("[✓] Reply button clicked.")
         print("[✓] Reply button clicked.")
         
         # Wait a bit for the input box to appear (may involve DOM change)
@@ -586,8 +640,11 @@ def send_reply(driver, comment, reply_text):
         # )
 
         input_box = driver.switch_to.active_element 
-        input_box.send_keys(reply_text)
-        print("Reply text inserted")
+        driver.execute_script("arguments[0].focus();", input_box)
+        actions = ActionChains(driver)
+        actions.key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+        print("[✓] Reply text inserted")
+        # logger.info("[✓] Reply text inserted")
         random_sleep(5, 7)
         reply_containers = driver.find_elements(
             By.XPATH,
@@ -606,17 +663,24 @@ def send_reply(driver, comment, reply_text):
 
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
         # post_button.click()
-        print("[✓] Reply submitted.")
+        # logger.info("[✓] Reply submitted.")
         
         random_sleep(5, 7)
-        print(f"[+] Replied with: {reply_text}")
+        message = f"[+] Replied with: {reply_text}"
+        # logger.info(message)
+        print(message)
+        return True, message
 
     except Exception as e:
-        print(f"[!] Failed to reply on comment: {e}")
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        screenshot_path = f"error_reply_{timestamp}.png"
-        driver.save_screenshot(screenshot_path)
-        print(f"[!] Screenshot saved as: {screenshot_path}")
+        driver.quit()
+        message = f"[!] Failed to reply on comment: {e}"
+        # logger.error(message)
+        print(message)
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # screenshot_path = f"error_reply_{timestamp}.png"
+        # driver.save_screenshot(screenshot_path)
+        # print(f"[!] Screenshot saved as: {screenshot_path}")
+        return False, message
 
 
 

@@ -15,6 +15,15 @@ from dotenv import load_dotenv
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 import logging
+from selenium.webdriver.chrome.options import Options
+from fake_useragent import UserAgent
+from selenium import webdriver
+from selenium.webdriver.common.proxy import Proxy, ProxyType
+from selenium.webdriver.support.ui import WebDriverWait
+import pickle
+from selenium.common.exceptions import TimeoutException, WebDriverException
+import os
+
 
 
 load_dotenv()
@@ -28,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 def perform_login(driver, email, password):
     try:
+        driver.save_screenshot("login.png")
         WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((
                 By.XPATH, 
@@ -191,20 +201,28 @@ def reply_on_comment(driver, comment, sadcaptcha, email, password, reply, video_
     except Exception as e:
         logger.info(f"[!] pause_video failed: {e}")
 
-from selenium.webdriver.support.ui import WebDriverWait
-import pickle
-from selenium.common.exceptions import TimeoutException, WebDriverException
 
 
-def load_cookies(driver, cookies_path=os.getenv("COOKIE_PATH")):
+def get_random_proxy():
+    # Randomly select a full proxy URL
+    proxies = [
+        "134.35.190.136:8080",  # Example proxy IP
+    "8.219.1.139:8090",     # Another example proxy IP
+    "91.107.86.207:3141",   # Another example proxy IP
+    "1.4.251.176:8080" 
+    ]
+    return random.choice(proxies)
+
+
+def load_cookies(driver, cookies_path="/home/ubuntu/tiktok_cookies.pkl"):
     if not os.path.exists(cookies_path):
         return False
 
     try:
         driver.get("https://www.tiktok.com")
+        # driver.get("https://www.google.com")
         with open(cookies_path, "rb") as f:
             cookies = pickle.load(f)
-
         for cookie in cookies:
             if "sameSite" in cookie and cookie["sameSite"] not in ["Strict", "Lax", "None"]:
                 del cookie["sameSite"]
@@ -217,22 +235,35 @@ def load_cookies(driver, cookies_path=os.getenv("COOKIE_PATH")):
         return True
     except Exception as e:
         print(f"[!] Failed to load cookies: {e}")
+        driver.quit()
         return False
 
 
 def main(video_url=None, comment=None, reply=None):
     driver = None
     try:
-        driver = uc.Chrome(headless=True)
-        driver.maximize_window()
+        #driver = uc.Chrome(headless=True)
+        chromedriver_path = "/usr/bin/chromedriver"
+        # os.environ["DISPLAY"] = ":1"  # Or set to :99 if you're using that
+        # os.environ["DISPLAY"] = ":99"
+
+        options = Options()
+        options.headless = True
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--remote-debugging-port=9223")
+        options.binary_location = "/usr/bin/google-chrome-stable"
+        driver = uc.Chrome(executable_path=chromedriver_path, options=options)
+        # driver = uc.Chrome(options=options)
+        # driver.maximize_window()
 
         api_key = "ca73e4fdf55a63b83ecfff3194754775"
         sadcaptcha = SeleniumSolver(driver, api_key, mouse_step_size=1, mouse_step_delay_ms=20)
-
-        # email = "japdavev5@gmail.com"
-        email = os.getenv("UNAME")
+        email = "japdavev5@gmail.com"
+      #  email = os.getenv("UNAME")
         password = "Tech@123$$$"
         if load_cookies(driver):
+            print("[✓] Cookies loaded. Skipping login.")
             logger.info("[✓] Cookies loaded. Skipping login.")
         else:
             logger.info("[!] No valid cookies found. Proceeding with login.")
@@ -253,22 +284,23 @@ def main(video_url=None, comment=None, reply=None):
             WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)
             logger.info(f"[✓] Login successful. Current URL: {driver.current_url}")
 
-            # ✅ Save cookies after successful login
             with open("tiktok_cookies.pkl", "wb") as f:
                 pickle.dump(driver.get_cookies(), f)
 
-        # 🧠 Already logged in — proceed with your automation
         if video_url and comment:
             driver.execute_script(f"window.location.href = '{video_url}';")
-            reopen_comment_section(driver)
+            # reopen_comment_section(driver, comment)
 
             random_sleep(5, 7)
             if reply is None:
+                reopen_comment_section(driver, comment)
                 # send_comment(driver, comment)
-                safe_action(driver, sadcaptcha, send_comment, comment)
+                status, message = safe_action(driver, sadcaptcha, send_comment, comment)
             else:
+                reopen_comment_section(driver, reply)
                 # send_reply(driver, comment, reply)
-                safe_action(driver, sadcaptcha, send_reply, comment, reply)
+                status, message = safe_action(driver, sadcaptcha, send_reply, comment, reply)
+            return status, message
         else:
             handle_after_login(driver, sadcaptcha)
 
@@ -276,12 +308,14 @@ def main(video_url=None, comment=None, reply=None):
 
     except TimeoutException:
         logger.info(f"[✖] Still not redirected to /foryou after login. Current URL: {driver.current_url}")
+        return "not reached to foryou"
     except Exception as e:
         logger.info(f"[!] Main error: {e}")
+        print(str(e))
+        return f"Error: {str(e)}"
     finally:
         if driver:
             driver.quit()
-
 
 if __name__ == "__main__":
     main(video_url=None, comment=None, reply=None)

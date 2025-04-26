@@ -13,9 +13,11 @@ def add_comment():
         return jsonify({"error": "videoUrl and comment are required"}), 400
 
     try:
-        main(video_url=video_url, comment=comment)
 
-        return jsonify({"message": "Comment added successfully"}), 200
+        status, message = main(video_url=video_url, comment=comment)
+        if status is True:
+            return jsonify({"message": message}), 200
+        return jsonify({"message": message}), 500
 
     except Exception as e:
         return jsonify({"error": f"Failed to comment: {e}"}), 500
@@ -32,13 +34,17 @@ def reply_comment():
         return jsonify({"error": "video Url, comment, and reply Comment are required"}), 400
 
     try:
-        main(video_url=video_url, comment=comment, reply=reply)
+        status, message = main(video_url=video_url, comment=comment, reply=reply)
+        if status is True:
+            return jsonify({"message": message}), 200
+        return jsonify({"message": message}), 500
 
-        return jsonify({"message": "Comment added successfully"}), 200
+        # return jsonify({"message": "Comment added successfully"}), 200
 
     except Exception as e:
         return jsonify({"error": f"Failed to comment: {e}"}), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
+
