@@ -239,8 +239,11 @@ def try_to_share_video(driver):
     random_sleep(2, 3)
 
     try:
+        # copy_btn = driver.find_element(By.XPATH,
+        #     "//div[@data-e2e='share-copy']//div[@tabindex='0'] | //button[contains(@class, 'TUXButton') and contains(@class, 'TUXButton--secondary') and contains(@class, 'css-1gq7k')]"
+        # )
         copy_btn = driver.find_element(By.XPATH,
-            "//div[@data-e2e='share-copy']//div[@tabindex='0'] | //button[contains(@class, 'TUXButton') and contains(@class, 'TUXButton--secondary') and contains(@class, 'css-1gq7k')]"
+            "//div[starts-with(@id, 'floating-ui-')]/div[2]/div[3]/div[1]/div/div[2]/div | //div[starts-with(@id, 'floating-ui-')]/div[2]/div[1]/div/div/div[2]/div/div/button"
         )
         copy_btn.click()
         print("[+] Link copied.")
@@ -250,7 +253,8 @@ def try_to_share_video(driver):
     random_sleep(1, 2)
 
     try:
-        close_popup = driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Close')]")
+        # close_popup = driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Close')]")
+        close_popup = driver.find_element(By.XPATH, "//div[starts-with(@id, 'floating-ui-')]/div[1]/div[2]/button")
         close_popup.click()
         print("[*] Share popup closed.")
     except NoSuchElementException:
@@ -259,8 +263,13 @@ def try_to_share_video(driver):
 
 def click_random_scroll_button(driver, scroll_up_count, max_up=2):
     try:
+        # xpath = (
+        #     "//*[@id='main-content-homepage_hot']//aside//button"
+        #     " | "
+        #     "//button[@aria-label='Go to next video']"
+        # )
         xpath = (
-            "//*[@id='main-content-homepage_hot']//aside//button"
+            "//div[contains(@class, 'DivFeedNavigationContainer')]//button"
             " | "
             "//button[@aria-label='Go to next video']"
         )

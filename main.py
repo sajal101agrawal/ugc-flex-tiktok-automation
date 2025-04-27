@@ -83,12 +83,14 @@ def perform_login(driver, email, password):
         raise
 
 
-def handle_after_login(driver, sadcaptcha):
+def handle_after_login(driver, sadcaptcha, is_comment_given=False):
     dismiss_cookie_banner(driver)
     video_count = random.randint(6, 10)
     like_index = random.randint(1, video_count - 2)
     share_index = random.randint(like_index + 1, video_count)
-    comment_index = random.randint(like_index + 1, video_count)
+    comment_index = -1 
+    if is_comment_given is False:
+        comment_index = random.randint(like_index + 1, video_count)
     # like_index = 1
     # comment_index = 2
     # share_index = 1
@@ -102,7 +104,7 @@ def handle_after_login(driver, sadcaptcha):
         if i == like_index:
             safe_action(driver, sadcaptcha, try_to_like_video)
 
-        if i == comment_index:
+        if i == comment_index and not is_comment_given:
             safe_action(driver, sadcaptcha, try_to_comment_video)
 
         if i == share_index:
@@ -148,7 +150,7 @@ def load_cookies(driver, cookies_path=os.getenv("COOKIE_PATH")):
 def main(video_url=None, comment=None, reply=None):
     driver = None
     try:
-        driver = uc.Chrome(headless=True)
+        driver = uc.Chrome(headless=False)
         # chromedriver_path = "/usr/bin/chromedriver"
         # os.environ["DISPLAY"] = ":1"  # Or set to :99 if you're using that
         # os.environ["DISPLAY"] = ":99"
@@ -204,6 +206,8 @@ def main(video_url=None, comment=None, reply=None):
             else:
                 reopen_comment_section(driver, reply)
                 status, message = safe_action(driver, sadcaptcha, send_reply, comment, reply)
+            if status is True:
+                handle_after_login(driver, sadcaptcha, is_comment_given=True)
             return status, message
         else:
             handle_after_login(driver, sadcaptcha)
