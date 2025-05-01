@@ -85,7 +85,7 @@ def perform_login(driver, email, password):
 
 def handle_after_login(driver, sadcaptcha, is_comment_given=False):
     dismiss_cookie_banner(driver)
-    video_count = random.randint(6, 10)
+    video_count = random.randint(6, 10) 
     like_index = random.randint(1, video_count - 2)
     share_index = random.randint(like_index + 1, video_count)
     comment_index = -1 
@@ -123,7 +123,7 @@ def handle_after_login(driver, sadcaptcha, is_comment_given=False):
         random_sleep(3, 5)
 
 
-def load_cookies(driver, cookies_path=os.getenv("COOKIE_PATH")):
+def load_cookies(driver, cookies_path="tiktok_cookies.pkl"):
     if not os.path.exists(cookies_path):
         return False
 
@@ -150,7 +150,7 @@ def load_cookies(driver, cookies_path=os.getenv("COOKIE_PATH")):
 def main(video_url=None, comment=None, reply=None):
     driver = None
     try:
-        driver = uc.Chrome(headless=False)
+        driver = uc.Chrome(headless=False, version_main=135)
         # chromedriver_path = "/usr/bin/chromedriver"
         # os.environ["DISPLAY"] = ":1"  # Or set to :99 if you're using that
         # os.environ["DISPLAY"] = ":99"
@@ -186,7 +186,7 @@ def main(video_url=None, comment=None, reply=None):
                 random_sleep(2, 5)
                 if not enter_verification_code(driver, email):
                     logger.info("[✖] Failed to enter verification code.")
-                    return
+                    return False, "[✖] Failed to enter verification code."
                 logger.info("[✓] Verification successful.")
 
             WebDriverWait(driver, 90).until(lambda d: "foryou" in d.current_url)

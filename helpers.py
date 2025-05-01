@@ -587,16 +587,54 @@ def clean_text(text):
     return re.sub(r'[^\w\s,!?\'".-]', '', text)
 
 
+def scroll_comment_section(driver, max_scrolls=100):
+    try:
+        # Wait for the comment container to appear
+        container = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//div[contains(@class, 'DivCommentListContainer')]")
+            )
+        )
+        print(container.size)
+
+        actions = ActionChains(driver)
+
+        # Use JavaScript to scroll the container directly
+        for i in range(max_scrolls):
+            # Scroll inside the container using mouse wheel simulation
+            actions.move_to_element(container).perform()  # Ensure container is in view
+            actions.scroll_by_amount(0, 300).perform()  # Scroll down by 300 pixels
+            print("Scrolledd downn")
+            # Wait for content to load after scroll
+            time.sleep(2)
+
+            # Fetch the comments after scrolling
+            comments = driver.find_elements(By.XPATH, "//span[@data-e2e='comment-level-1']/p")
+            print(f"Scroll #{i + 1}: Fetched {len(comments)} comments.")
+
+            # Check if we have fetched enough comments, or assume the end of comments is reached
+            if len(comments) > 50:  # Adjust this based on the total number of comments expected
+                print("[✓] Reached the end of comments.")
+                break
+
+        print("[✓] Scrolling finished.")
+
+    except Exception as e:
+        print(f"[!] Error while scrolling the comment section: {e}")
+
+
 def send_reply(driver, comment, reply_text):
     try:
+        # scroll_comment_section(driver)
         # Wait for comments to load and find the target comment
         comments = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((
-                By.XPATH, 
-                "//div[contains(@class, 'DivCommentItemWrapper')]//p"
-            )))
+            EC.presence_of_all_elements_located((By.XPATH, 
+            "//span[@data-e2e='comment-level-1']/p"))
+        )
+
 
         # logger.info(f"[✓] Able to fetch all comments: {len(comments)}")
+        print(f"[✓] Able to fetch all comments: {len(comments)}")
         target = None
 
         for c in comments:
@@ -653,7 +691,7 @@ def send_reply(driver, comment, reply_text):
             try:
                 post_button = container.find_element(By.XPATH, ".//div[@data-e2e='comment-post' and @aria-disabled='false']")
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
-                post_button.click()
+                # post_button.click()
                 break
             except:
                 continue
