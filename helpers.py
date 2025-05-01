@@ -14,18 +14,59 @@ import time
 import random
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from tiktok_captcha_solver import SeleniumSolver
+import undetected_chromedriver as uc
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+
+
+# import pyperclip
+# import clipboard
+
 import logging
 
 # Configure logging
-# logging.basicConfig(
-#     filename="output.log",  # Set the log file name
-#     level=logging.INFO,  # Log only INFO and above levels
-#     format="%(asctime)s [%(levelname)s] %(message)s"  # Log format
-# )
-# logger = logging.getLogger(__name__)
-
-
+logging.basicConfig(
+    filename="output.log",  # Set the log file name
+    level=logging.INFO,  # Log only INFO and above levels
+    format="%(asctime)s [%(levelname)s] %(message)s"  # Log format
+)
+logger = logging.getLogger(__name__)
 load_dotenv()
+
+tiktok_logger = logging.getLogger('tiktok_logger')
+tiktok_logger.setLevel(logging.INFO)
+
+
+def connect_driver():
+    chromedriver_path = "/usr/bin/chromedriver"
+    # os.environ["DISPLAY"] = ":1"  # Or set to :99 if you're using that
+    # os.environ["DISPLAY"] = ":99"
+
+    options = Options()
+    options.headless = True
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--remote-debugging-port=9223")
+    options.binary_location = "/usr/bin/google-chrome-stable"
+    service = Service(chromedriver_path)
+    driver = uc.Chrome(service=service, options=options, version_main=135)
+    # driver = uc.Chrome(executable_path=chromedriver_path, options=options)
+    # driver.maximize_window()
+
+    api_key = "ca73e4fdf55a63b83ecfff3194754775"
+    sadcaptcha = SeleniumSolver(driver, api_key, mouse_step_size=1, mouse_step_delay_ms=20)
+    return driver, sadcaptcha
+
+
+def is_driver_alive(driver):
+    try:
+        driver.title  # basic check to ping the browser
+        return True
+    except:
+        return False
+
+
 
 def get_code_from_email(username=None, delay=10):
     try:
@@ -148,6 +189,8 @@ def try_to_like_video(driver):
     try:
         index = get_active_scroll_index(driver)
         print(f"[*] Active scroll index: {index}")
+        logger.info(f"[*] Active scroll index: {index}")
+        tiktok_logger.info(f"[*] Active scroll index: {index}")
         article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
         like_btn = article.find_element(By.XPATH, ".//button[.//span[@data-e2e='like-icon']]")
         try:
@@ -157,6 +200,8 @@ def try_to_like_video(driver):
             driver.execute_script("arguments[0].click();", like_btn)
         random_sleep(1, 2)
         print("[+] Video liked.")
+        logger.info("[+] Video liked.")
+        tiktok_logger.info("[+] Video liked.")
         return
 
     except Exception as e:
@@ -232,6 +277,7 @@ def try_to_comment_video(driver):
 def try_to_share_video(driver):
     index = get_active_scroll_index(driver)
     print(f"[*] Active scroll index: {index}")  
+    logger.info(f"[*] Active scroll index: {index}")  
     article = driver.find_element(By.XPATH, f"//article[@data-scroll-index='{index}']")
     share_btn = article.find_element(By.XPATH, ".//section[2]//button[3]")
     share_btn.click()
@@ -239,39 +285,39 @@ def try_to_share_video(driver):
     random_sleep(2, 3)
 
     try:
-        # copy_btn = driver.find_element(By.XPATH,
-        #     "//div[@data-e2e='share-copy']//div[@tabindex='0'] | //button[contains(@class, 'TUXButton') and contains(@class, 'TUXButton--secondary') and contains(@class, 'css-1gq7k')]"
-        # )
         copy_btn = driver.find_element(By.XPATH,
             "//div[starts-with(@id, 'floating-ui-')]/div[2]/div[3]/div[1]/div/div[2]/div | //div[starts-with(@id, 'floating-ui-')]/div[2]/div[1]/div/div/div[2]/div/div/button"
         )
         copy_btn.click()
         print("[+] Link copied.")
+        logger.info("[+] Link copied.")
     except NoSuchElementException:
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # screenshot_path = f"copy_error_screenshot_{timestamp}.png"
+        # driver.save_screenshot(screenshot_path)
+        # print(f"[!] Screenshot saved as: {screenshot_path}")
         print("[!] Copy link not found.")
 
     random_sleep(1, 2)
 
     try:
-        # close_popup = driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Close')]")
         close_popup = driver.find_element(By.XPATH, "//div[starts-with(@id, 'floating-ui-')]/div[1]/div[2]/button")
         close_popup.click()
         print("[*] Share popup closed.")
     except NoSuchElementException:
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # screenshot_path = f"close_error_screenshot_{timestamp}.png"
+        # driver.save_screenshot(screenshot_path)
+        # print(f"[!] Screenshot saved as: {screenshot_path}")
         print("[-] Close button for share popup not found.")
 
 
 def click_random_scroll_button(driver, scroll_up_count, max_up=2):
     try:
-        # xpath = (
-        #     "//*[@id='main-content-homepage_hot']//aside//button"
-        #     " | "
-        #     "//button[@aria-label='Go to next video']"
-        # )
         xpath = (
             "//div[contains(@class, 'DivFeedNavigationContainer')]//button"
             " | "
-            "//button[@aria-label='Go to next video']"
+            "//div[contains(@class, 'DivVideoSwitchWrapper')]//button"
         )
 
         buttons = WebDriverWait(driver, 5).until(
@@ -288,6 +334,7 @@ def click_random_scroll_button(driver, scroll_up_count, max_up=2):
             return False, scroll_up_count
 
         print(f"[✓] Found {len(scroll_buttons)} usable scroll button(s).")
+        tiktok_logger.info(f"[✓] Found {len(scroll_buttons)} usable scroll button(s).")
 
         scroll_direction = "up" if scroll_up_count < max_up and random.random() < 0.3 else "down"
         selected_button = scroll_buttons[0] if scroll_direction == "up" else scroll_buttons[-1]
@@ -300,10 +347,20 @@ def click_random_scroll_button(driver, scroll_up_count, max_up=2):
             try:
                 selected_button.click()
                 print(f"[+] Scrolled {scroll_direction} using button.")
+                logger.info(f"[+] Scrolled {scroll_direction} using button.")
                 break
             except Exception as e:
+                # timestamp = time.strftime("%Y%m%d-%H%M%S")
+                # screenshot_path = f"click_error_screenshot_{timestamp}.png"
+                # driver.save_screenshot(screenshot_path)
+                # print(f"[!] Screenshot saved as: {screenshot_path}")
                 print(f"[!] Click attempt {attempt + 1} failed: {e}")
                 time.sleep(1)
+                button_div = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//*[contains(@class, 'DivPlayIconContainer ')]"))
+                )
+                button_div.click()
+                pause_video_with_spacebar(driver)
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", selected_button)
                 if attempt == 2:
                     print("[✖] All attempts failed. Skipping scroll.")
@@ -314,7 +371,11 @@ def click_random_scroll_button(driver, scroll_up_count, max_up=2):
 
         return True, scroll_up_count
     except Exception as e:
-        print(f"[!] Scroll error: {e}")
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # screenshot_path = f"error_screenshot_{timestamp}.png"
+        # driver.save_screenshot(screenshot_path)
+        # print(f"[!] Screenshot saved as: {screenshot_path}")
+        print(f"[!] Scroll error: {str(e)}")
         return False, scroll_up_count
 
 
@@ -347,6 +408,9 @@ def is_verification_prompt_present(driver):
 def safe_action(driver, sadcaptcha, action_fn, *args, retries=3, **kwargs):
     for attempt in range(retries):
         try:
+            if not is_driver_alive(driver):
+                print("Driver is Not Alive")
+                driver, sadcaptcha = connect_driver()
             if is_captcha_present(driver):
                 print("[!] CAPTCHA detected before action.")
                 sadcaptcha.solve_captcha_if_present()
@@ -361,6 +425,10 @@ def safe_action(driver, sadcaptcha, action_fn, *args, retries=3, **kwargs):
 
             return result
         except Exception as e:
+            # timestamp = time.strftime("%Y%m%d-%H%M%S")
+            # screenshot_path = f"error_screenshot_{timestamp}.png"
+            # driver.save_screenshot(screenshot_path)
+            # print(f"[!] Screenshot saved as: {screenshot_path}")
             print(f"[!] safe_action attempt {attempt + 1} failed: {e}")
             if attempt == retries - 1:
                 raise
@@ -456,8 +524,20 @@ def wait_for_captcha_to_clear(driver, sadcaptcha, timeout=90):
 
 
 def pause_video_with_spacebar(driver):
-    ActionChains(driver).send_keys(Keys.SPACE).perform()
-    print("[✓] Paused/Played video.")
+    is_playing = driver.execute_script("""
+        const video = document.querySelector('video');
+        return !!(video && !video.paused && !video.ended && video.readyState > 2);
+    """)
+    
+    # timestamp = time.strftime("%Y%m%d-%H%M%S")
+    # screenshot_path = f"pause_check_screenshot_{timestamp}.png"
+    # driver.save_screenshot(screenshot_path)
+    # print(f"[!] Screenshot saved as: {screenshot_path}")
+    if is_playing:
+        ActionChains(driver).send_keys(Keys.SPACE).perform()
+        print("[✓] Video was playing — paused it.")
+    else:
+        print("[ℹ] Video is already paused.")
 
 
 def open_comment_section(driver):
@@ -519,11 +599,13 @@ def open_other_login_options(driver):
 def reopen_comment_section(driver, comment):
     try:
         random_sleep(2, 4)
+        pause_video_with_spacebar(driver)
         button_div = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//*[contains(@class, 'DivIconWithRedDotContainer')]"))
         )
         button_div.click()
-        search_input = button_div.find_element(By.XPATH, '//*[@id="app"]/div[2]/div/div/div[5]/div[1]/div[2]/form/input')
+        # search_input = button_div.find_element(By.XPATH, '//*[@id="app"]/div[2]/div/div/div[5]/div[1]/div[2]/form/input')
+        search_input = driver.switch_to.active_element
         search_input.send_keys(comment)
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).send_keys('a').key_up(Keys.CONTROL).perform()  # Select all
@@ -534,10 +616,15 @@ def reopen_comment_section(driver, comment):
         )
         close_button.click()  # Close the comment section
         print("[✓] Closed the comment section successfully.")
+        pause_video_with_spacebar(driver)
         open_comment_section(driver)
         print("[✓] Re-clicked comment button post login.")
-    except:
-        print("[~] Failed to re-click comment button.")
+    except Exception as e:
+        # timestamp = time.strftime("%Y%m%d-%H%M%S")
+        # screenshot_path = f"error_screenshot_{timestamp}.png"
+        # driver.save_screenshot(screenshot_path)
+        # print(f"[!] Screenshot saved as: {screenshot_path}")
+        print(f"[~] Failed to re-click comment button.: {str(e)}")
 
 
 def send_comment(driver, comment):
@@ -568,7 +655,7 @@ def send_comment(driver, comment):
         # print(f"[!] Screenshot saved as: {screenshot_path}")
         message = f"[+] Comment posted: {comment}"
         print(message)
-        # logger.info(message)
+        logger.info(message)
         return True, message
     except Exception as e:
         driver.quit()
@@ -577,7 +664,7 @@ def send_comment(driver, comment):
         # driver.save_screenshot(screenshot_path)
         # print(f"[!] Screenshot saved as: {screenshot_path}")
         message = f"[!] Failed to send comment: {e}"
-        # logger.error(message)
+        logger.error(message)
         print(message)
         return False, message
 
@@ -587,92 +674,196 @@ def clean_text(text):
     return re.sub(r'[^\w\s,!?\'".-]', '', text)
 
 
-def scroll_comment_section(driver, max_scrolls=100):
+
+# def send_reply(driver, comment, reply_text):
+#     try:
+#         # Wait for comments to load and find the target comment
+#        # scroll_to_load_all_comments(driver)
+#         # Wait for comments to load and find the target comment
+#         comments = WebDriverWait(driver, 10).until(
+#             EC.presence_of_all_elements_located((
+#                 By.XPATH, 
+#                 "//div[contains(@class, 'DivCommentItemWrapper')]//p"
+#             )))
+
+#         print(f"[✓] Able to fetch all comments: {len(comments)}")
+#         logger.info(f"[✓] Able to fetch all comments: {len(comments)}")
+#         target = None
+
+#         for c in comments:
+#             try:
+#                 cleaned_comment = clean_text(c.text.strip().lower())
+#                 print(cleaned_comment)
+#                 if clean_text(comment.strip().lower()) in cleaned_comment:
+#                     target = c
+#                     logger.info(f"[✓] Comment fetched successfully!")
+#                     break
+#             except Exception as e:
+#                 print(f"[!] Error while processing comment: {e}")
+#                 continue
+
+#         if not target:
+#             message = f"[✖] Could not find the comment: '{comment}'"
+#             logger.error(message)
+#             print(message)
+#             time.sleep(10)
+#             return False, message
+
+#         # Re-find the reply button within the target comment block
+#         comment_position = target.location
+#         reply_button = target.find_element(
+#             By.XPATH,
+#             ".//ancestor::div[contains(@class, 'DivCommentItemWrapper')]//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
+#         )
+        
+#         # Scroll into view to make sure it's clickable
+#         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", reply_button)
+        
+#         # Click the reply button
+#         random_sleep(1, 2)
+#         reply_button.click()
+#         logger.info("[✓] Reply button clicked.")
+        
+#         # Wait a bit for the input box to appear (may involve DOM change)
+#         random_sleep(2, 3)
+        
+#         # Re-locate the input box right before interacting with it
+#         # input_box = WebDriverWait(driver, 10).until(
+#         #     EC.presence_of_element_located(
+#         #         (By.XPATH, "//div[@data-e2e='comment-input']//div[@contenteditable='true' and contains(text(), 'Add a reply')]")
+#         #     )
+#         # )
+
+#         input_box = driver.switch_to.active_element 
+#         driver.execute_script("arguments[0].focus();", input_box)
+#         actions = ActionChains(driver)
+#         actions.key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
+#         logger.info("[✓] Reply text inserted")
+#         random_sleep(5, 7)
+#         reply_containers = driver.find_elements(
+#             By.XPATH,
+#             "//div[contains(@class, 'DivReplyContainer') or contains(@class, 'DivReplyCommentEditorContainer')]"
+#         )
+
+#         for container in reply_containers:
+#             try:
+#                 post_button = container.find_element(By.XPATH, ".//div[@data-e2e='comment-post' and @aria-disabled='false']")
+#                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
+#                 post_button.click()
+#                 break
+#             except:
+#                 continue
+
+
+#         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
+#         # post_button.click()
+#         logger.info("[✓] Reply submitted.")
+        
+#         random_sleep(5, 7)
+#         message = f"[+] Replied with: {reply_text}"
+#         logger.info(message)
+#         print(message)
+#         return True, message
+
+#     except Exception as e:
+#         driver.quit()
+#         message = f"[!] Failed to reply on comment: {e}"
+#         logger.error(message)
+#         print(message)
+#         # timestamp = time.strftime("%Y%m%d-%H%M%S")
+#         # screenshot_path = f"error_reply_{timestamp}.png"
+#         # driver.save_screenshot(screenshot_path)
+#         # print(f"[!] Screenshot saved as: {screenshot_path}")
+#         return False, message
+
+
+
+def detect_scrollable_comment_container(driver):
+    containers = driver.find_elements(By.CLASS_NAME, 'DivCommentListContainer')
+    
+    for container in containers:
+        try:
+            scroll_height = driver.execute_script("return arguments[0].scrollHeight", container)
+            client_height = driver.execute_script("return arguments[0].clientHeight", container)
+
+            # Only return containers that have scrollable content
+            if scroll_height > client_height:
+                return container
+        except Exception as e:
+            print(f"[!] Error testing container: {e}")
+            continue
+    
+    return None
+
+
+def scroll_to_load_and_find_comment(driver, comment, max_scrolls=100, delay=5):
     try:
-        # Wait for the comment container to appear
-        container = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//div[contains(@class, 'DivCommentListContainer')]")
-            )
-        )
-        print(container.size)
+        scroll_container = detect_scrollable_comment_container(driver)
+        last_scroll_position = 0
 
-        actions = ActionChains(driver)
-
-        # Use JavaScript to scroll the container directly
         for i in range(max_scrolls):
-            # Scroll inside the container using mouse wheel simulation
-            actions.move_to_element(container).perform()  # Ensure container is in view
-            actions.scroll_by_amount(0, 300).perform()  # Scroll down by 300 pixels
-            print("Scrolledd downn")
-            # Wait for content to load after scroll
-            time.sleep(2)
+            # Scroll the container or main window
+            if scroll_container:
+                # Get the current scroll position and the total scroll height of the container
+                current_scroll_position = driver.execute_script("return arguments[0].scrollTop", scroll_container)
+                scroll_height = driver.execute_script("return arguments[0].scrollHeight", scroll_container)
+                
+                # Scroll to 90% of the scroll height
+                target_scroll_position = scroll_height * 0.85  # 85% of the total scroll height
+                driver.execute_script("arguments[0].scrollTop = arguments[1]", scroll_container, target_scroll_position)
+                print("[>] Scrolling comment container to 85% of its height")
+            else:
+                # Scroll to 90% of the document body height if no scrollable container is found
+                current_scroll_position = driver.execute_script("return window.pageYOffset")
+                document_height = driver.execute_script("return document.body.scrollHeight")
+                
+                # Scroll to 90% of the document body height
+                target_scroll_position = document_height * 0.85  # 85% of the document height
+                driver.execute_script("window.scrollTo(0, arguments[0])", target_scroll_position)
+                print("[>] Scrolling main window to 85% of the page height")
 
-            # Fetch the comments after scrolling
-            comments = driver.find_elements(By.XPATH, "//span[@data-e2e='comment-level-1']/p")
-            print(f"Scroll #{i + 1}: Fetched {len(comments)} comments.")
+            time.sleep(delay)
 
-            # Check if we have fetched enough comments, or assume the end of comments is reached
-            if len(comments) > 50:  # Adjust this based on the total number of comments expected
-                print("[✓] Reached the end of comments.")
-                break
+            # Look for the target comment directly in the loaded comments
+            try:
+                # Dynamically find the comment you're looking for as it appears
+                target_comment = driver.find_element(
+                    By.XPATH, 
+                    f"//span[@data-e2e='comment-level-1']/p[contains(text(), '{comment.strip()}')]"
+                )
 
-        print("[✓] Scrolling finished.")
+                # If found, click reply button
+                print(f"[✓] Comment found: {comment}")
+                reply_button = target_comment.find_element(
+                    By.XPATH, 
+                    ".//ancestor::div[contains(@class, 'DivCommentItemWrapper')]//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
+                )
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", reply_button)
+                reply_button.click()
+                print("[✓] Reply button clicked.")
+                return True, f"Found and clicked reply for comment: {comment}"
 
+            except NoSuchElementException:
+                print(f"[!] Comment not found yet, continuing to scroll.")
+                continue  # Continue scrolling until the comment is found or max_scrolls reached
+
+        # If after scrolling we can't find the comment, report failure
+        message = f"[✖] Could not find the comment: '{comment}'"
+        print(message)
+        return False, message
     except Exception as e:
-        print(f"[!] Error while scrolling the comment section: {e}")
+        print(f"[!] Error during scroll: {e}")
+        return False, f"[!] Error during scroll: {e}"
 
 
 def send_reply(driver, comment, reply_text):
     try:
-        # scroll_comment_section(driver)
-        # Wait for comments to load and find the target comment
-        comments = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.XPATH, 
-            "//span[@data-e2e='comment-level-1']/p"))
-        )
-
-
-        # logger.info(f"[✓] Able to fetch all comments: {len(comments)}")
-        print(f"[✓] Able to fetch all comments: {len(comments)}")
-        target = None
-
-        for c in comments:
-            try:
-                cleaned_comment = clean_text(c.text.strip().lower())
-                print(cleaned_comment)
-                if clean_text(comment.strip().lower()) in cleaned_comment:
-                    target = c
-                    # logger.info(f"[✓] Comment fetched successfully!")
-                    print(f"[✓] Comment fetched successfully!")
-                    break
-            except Exception as e:
-                print(f"[!] Error while processing comment: {e}")
-                continue
-
-        if not target:
-            driver.quit()
-            message = f"[✖] Could not find the comment: '{comment}'"
-            # logger.error(message)
-            print(message)
-            time.sleep(10)
+        # Call the optimized function to find and reply to the comment
+        success, message = scroll_to_load_and_find_comment(driver, comment)
+        if not success:
             return False, message
 
-        reply_button = target.find_element(
-            By.XPATH,
-            ".//ancestor::div[contains(@class, 'DivCommentItemWrapper')]//span[@aria-label='Reply' and @role='button' and contains(@data-e2e, 'comment-reply')]"
-        )
-        
-        # Scroll into view to make sure it's clickable
-        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", reply_button)
-        
-        # Click the reply button
-        random_sleep(1, 2)
-        reply_button.click()
-        # logger.info("[✓] Reply button clicked.")
-        print("[✓] Reply button clicked.")
-        
-        # Wait a bit for the input box to appear (may involve DOM change)
+        # Wait a bit for the reply input box to appear (may involve DOM change)
         random_sleep(2, 3)
 
         input_box = driver.switch_to.active_element
@@ -680,8 +871,9 @@ def send_reply(driver, comment, reply_text):
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()
         print("[✓] Reply text inserted")
-        # logger.info("[✓] Reply text inserted")
         random_sleep(5, 7)
+
+        # Find and click the post button
         reply_containers = driver.find_elements(
             By.XPATH,
             "//div[contains(@class, 'DivReplyContainer') or contains(@class, 'DivReplyCommentEditorContainer')]"
@@ -691,32 +883,37 @@ def send_reply(driver, comment, reply_text):
             try:
                 post_button = container.find_element(By.XPATH, ".//div[@data-e2e='comment-post' and @aria-disabled='false']")
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
-                # post_button.click()
+                post_button.click()  # Uncomment to submit
                 break
             except:
                 continue
 
-
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", post_button)
-        # post_button.click()
-        # logger.info("[✓] Reply submitted.")
-        
         random_sleep(5, 7)
-        message = f"[+] Replied with: {reply_text}"
-        # logger.info(message)
-        print(message)
-        return True, message
+        print(f"[+] Replied with: {reply_text}")
+        return True, f"Replied with: {reply_text}"
 
     except Exception as e:
         driver.quit()
-        message = f"[!] Failed to reply on comment: {e}"
-        # logger.error(message)
-        print(message)
+        print(f"[!] Failed to reply on comment: {e}")
         # timestamp = time.strftime("%Y%m%d-%H%M%S")
         # screenshot_path = f"error_reply_{timestamp}.png"
         # driver.save_screenshot(screenshot_path)
         # print(f"[!] Screenshot saved as: {screenshot_path}")
-        return False, message
+        return False, f"[!] Failed to reply on comment: {e}"
+
+
+# def close_comment_panel(driver):
+#     try:
+#         xpath = (
+#             "//button[@role='button' and @aria-label='Close' and @data-e2e='browse-close']"
+#             " | //button[@aria-label='exit']"
+#         )
+#         close_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xpath)))
+#         close_btn.click()
+#         print("[✓] Closed comment panel.")
+#     except Exception as e:
+#         print(f"[!] Could not close comment panel: {e}")
 
 
 def dismiss_cookie_banner(driver):
@@ -743,4 +940,3 @@ def dismiss_cookie_banner(driver):
             print("[~] Could not find or click 'Decline optional cookies' via JS.")
     except Exception as e:
         print(f"[✖] Error dismissing cookie banner: {e}")
-

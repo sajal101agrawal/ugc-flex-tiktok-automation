@@ -197,6 +197,8 @@ def main(video_url=None, comment=None, reply=None):
 
         if video_url and comment:
             driver.execute_script(f"window.location.href = '{video_url}';")
+            pause_video_with_spacebar(driver)
+            sadcaptcha.solve_captcha_if_present()
             # reopen_comment_section(driver, comment)
 
             random_sleep(5, 7)
